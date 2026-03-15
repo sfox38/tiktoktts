@@ -1,4 +1,4 @@
-# TikTok TTS — Home Assistant Custom Integration
+# TikTok TTS : Home Assistant Custom Integration
 
 A Home Assistant custom integration that provides Text-to-Speech using TikTok's voice engine, supporting a wide range of languages and expressive voices.
 
@@ -52,7 +52,7 @@ If you were using [philipp-luettecke/tiktoktts](https://github.com/philipp-luett
 
 ### Step 1: Remove the `platform:` entry from `configuration.yaml`
 
-Open your `configuration.yaml` and delete the TikTok TTS platform entry. It will look something like this — remove the whole block:
+Open your `configuration.yaml` and delete the TikTok TTS platform entry. It will look something like this - remove the whole block:
 
 ```yaml
 tts:
@@ -150,7 +150,7 @@ The `language` field filters available voices in the Automations editor UI. The 
 Voices are grouped by language. The **Voice ID** is the value to use in the
 `options.voice` field of the `tts.speak` action.
 
-#### 🇺🇸 English (US) — `en_us`
+#### 🇺🇸 English (US) `en_us`
 
 | Voice ID | Description |
 |---|---|
@@ -161,47 +161,47 @@ Voices are grouped by language. The **Voice ID** is the value to use in the
 | `en_us_009` | Male 3 |
 | `en_us_010` | Male 4 |
 
-#### 🇬🇧 English (UK) — `en_uk`
+#### 🇬🇧 English (UK) `en_uk`
 
 | Voice ID | Description |
 |---|---|
 | `en_uk_001` | Male 1 |
 | `en_uk_003` | Male 2 |
 
-#### 🇦🇺 English (AU) — `en_au`
+#### 🇦🇺 English (AU) `en_au`
 
 | Voice ID | Description |
 |---|---|
 | `en_au_001` | Female |
 | `en_au_002` | Male |
 
-#### 🇫🇷 French — `fr`
+#### 🇫🇷 French `fr`
 
 | Voice ID | Description |
 |---|---|
 | `fr_001` | Male 1 |
 | `fr_002` | Male 2 |
 
-#### 🇩🇪 German — `de`
+#### 🇩🇪 German `de`
 
 | Voice ID | Description |
 |---|---|
 | `de_001` | Female |
 | `de_002` | Male |
 
-#### 🇪🇸 Spanish — `es`
+#### 🇪🇸 Spanish `es`
 
 | Voice ID | Description |
 |---|---|
 | `es_002` | Male |
 
-#### 🇲🇽 Spanish (Mexico) — `es_mx`
+#### 🇲🇽 Spanish (Mexico) `es_mx`
 
 | Voice ID | Description |
 |---|---|
 | `es_mx_002` | Male |
 
-#### 🇧🇷 Portuguese (Brazil) — `pt_br`
+#### 🇧🇷 Portuguese (Brazil) `pt_br`
 
 | Voice ID | Description |
 |---|---|
@@ -210,13 +210,13 @@ Voices are grouped by language. The **Voice ID** is the value to use in the
 | `br_004` | Female 3 |
 | `br_005` | Male |
 
-#### 🇮🇩 Indonesian — `id`
+#### 🇮🇩 Indonesian `id`
 
 | Voice ID | Description |
 |---|---|
 | `id_001` | Female |
 
-#### 🇯🇵 Japanese — `ja`
+#### 🇯🇵 Japanese `ja`
 
 | Voice ID | Description |
 |---|---|
@@ -225,7 +225,7 @@ Voices are grouped by language. The **Voice ID** is the value to use in the
 | `jp_005` | Female 3 |
 | `jp_006` | Male |
 
-#### 🇰🇷 Korean — `ko`
+#### 🇰🇷 Korean `ko`
 
 | Voice ID | Description |
 |---|---|
@@ -233,7 +233,7 @@ Voices are grouped by language. The **Voice ID** is the value to use in the
 | `kr_003` | Female |
 | `kr_004` | Male 2 |
 
-#### 🎭 Character Voices — `en_us`
+#### 🎭 Character Voices `en_us`
 
 These are novelty voices included in the English (US) language group.
 
@@ -246,7 +246,7 @@ These are novelty voices included in the English (US) language group.
 | `en_us_stormtrooper` | Stormtrooper |
 | `en_us_rocket` | Rocket Raccoon |
 
-#### 🎵 Singing / Expressive Voices — `en_us`
+#### 🎵 Singing / Expressive Voices `en_us`
 
 These voices work best with musical or expressive text.
 They are included in the English (US) language group.
