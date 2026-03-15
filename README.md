@@ -34,6 +34,53 @@ A Home Assistant custom integration that provides Text-to-Speech using TikTok's 
 2. Copy the `tiktoktts` folder into your `config/custom_components/` directory. The result should be `config/custom_components/tiktoktts/`.
 3. Restart Home Assistant.
 
+---
+
+## Upgrading from the Original Integration
+
+If you were using [philipp-luettecke/tiktoktts](https://github.com/philipp-luettecke/tiktoktts), this fork has **breaking changes** that require a clean removal before installing. You cannot simply overwrite the old files.
+
+### Breaking Changes
+
+| What changed | Original | This fork |
+|---|---|---|
+| **Configuration method** | `configuration.yaml` | UI config flow (Settings → Devices & Services) |
+| **Entity ID** | May vary | Always `tts.tiktoktts` |
+| **Default language** | `de` (German) | `en_us` (English US) |
+| **Default voice** | `de_001` | `en_us_001` |
+| **`platform:` entry in YAML** | Required | **Must be removed** |
+
+### Step 1: Remove the `platform:` entry from `configuration.yaml`
+
+Open your `configuration.yaml` and delete the TikTok TTS platform entry. It will look something like this — remove the whole block:
+
+```yaml
+tts:
+  - platform: tiktoktts
+    api_endpoint: https://tiktok-tts.weilnet.workers.dev
+    voice: en_us_001
+```
+
+If `tts:` was only used for TikTok TTS, remove the entire `tts:` section. If you have other TTS platforms listed under `tts:`, remove only the `tiktoktts` entry and leave the others.
+
+### Step 2: Delete the Old Integration Files
+
+In your `config/custom_components/` directory, delete the entire `tiktoktts/` folder and everything inside it.
+
+### Step 3: Clear the Old TTS Cache
+
+HA caches generated audio files and sometimes holds on to old entity state. Go to **Developer Tools -> Template** and confirm `tts.tiktoktts` no longer appears in **Developer Tools -> States**. If it does, click the entity and use the delete (bin) icon to remove it.
+
+### Step 4: Restart Home Assistant
+
+Go to **Settings -> System → Restart** and do a full restart (not Quick Reload).
+
+### Step 5: Install This Fork and Reconfigure
+
+Follow the [Installation](#installation) steps below. When you reach **Settings → Devices & Services → Add Integration**, you will go through the new UI setup wizard to reconfigure your endpoint and default voice.
+
+> [!NOTE]
+> Any automations that used `tts.tiktoktts` with a `platform: tiktoktts` style service call will need to be updated to use the `tts.speak` action format shown in the [Usage](#usage) section below.
 
 ---
 
@@ -96,6 +143,123 @@ The `language` field filters available voices in the Automations editor UI. The 
 | `id` | Indonesian |
 | `ja` | Japanese |
 | `ko` | Korean |
+
+
+### Supported Voices
+
+Voices are grouped by language. The **Voice ID** is the value to use in the
+`options.voice` field of the `tts.speak` action.
+
+#### 🇺🇸 English (US) — `en_us`
+
+| Voice ID | Description |
+|---|---|
+| `en_us_001` | Female (International 1) |
+| `en_us_002` | Female (International 2) |
+| `en_us_006` | Male 1 |
+| `en_us_007` | Male 2 |
+| `en_us_009` | Male 3 |
+| `en_us_010` | Male 4 |
+
+#### 🇬🇧 English (UK) — `en_uk`
+
+| Voice ID | Description |
+|---|---|
+| `en_uk_001` | Male 1 |
+| `en_uk_003` | Male 2 |
+
+#### 🇦🇺 English (AU) — `en_au`
+
+| Voice ID | Description |
+|---|---|
+| `en_au_001` | Female |
+| `en_au_002` | Male |
+
+#### 🇫🇷 French — `fr`
+
+| Voice ID | Description |
+|---|---|
+| `fr_001` | Male 1 |
+| `fr_002` | Male 2 |
+
+#### 🇩🇪 German — `de`
+
+| Voice ID | Description |
+|---|---|
+| `de_001` | Female |
+| `de_002` | Male |
+
+#### 🇪🇸 Spanish — `es`
+
+| Voice ID | Description |
+|---|---|
+| `es_002` | Male |
+
+#### 🇲🇽 Spanish (Mexico) — `es_mx`
+
+| Voice ID | Description |
+|---|---|
+| `es_mx_002` | Male |
+
+#### 🇧🇷 Portuguese (Brazil) — `pt_br`
+
+| Voice ID | Description |
+|---|---|
+| `br_001` | Female 1 |
+| `br_003` | Female 2 |
+| `br_004` | Female 3 |
+| `br_005` | Male |
+
+#### 🇮🇩 Indonesian — `id`
+
+| Voice ID | Description |
+|---|---|
+| `id_001` | Female |
+
+#### 🇯🇵 Japanese — `ja`
+
+| Voice ID | Description |
+|---|---|
+| `jp_001` | Female 1 |
+| `jp_003` | Female 2 |
+| `jp_005` | Female 3 |
+| `jp_006` | Male |
+
+#### 🇰🇷 Korean — `ko`
+
+| Voice ID | Description |
+|---|---|
+| `kr_002` | Male 1 |
+| `kr_003` | Female |
+| `kr_004` | Male 2 |
+
+#### 🎭 Character Voices — `en_us`
+
+These are novelty voices included in the English (US) language group.
+
+| Voice ID | Description |
+|---|---|
+| `en_us_ghostface` | Ghost Face (Scream) |
+| `en_us_chewbacca` | Chewbacca |
+| `en_us_c3po` | C-3PO |
+| `en_us_stitch` | Stitch |
+| `en_us_stormtrooper` | Stormtrooper |
+| `en_us_rocket` | Rocket Raccoon |
+
+#### 🎵 Singing / Expressive Voices — `en_us`
+
+These voices work best with musical or expressive text.
+They are included in the English (US) language group.
+
+| Voice ID | Description |
+|---|---|
+| `en_female_f08_salut_damour` | Alto |
+| `en_male_m03_lobby` | Tenor |
+| `en_female_f08_warmy_breeze` | Warmy Breeze |
+| `en_male_m03_sunshine_soon` | Sunshine Soon |
+| `en_male_narration` | Narrator |
+| `en_male_funny` | Wacky |
+| `en_female_emotional` | Peaceful / Emotional |
 
 ### Changing the Default Voice
 
