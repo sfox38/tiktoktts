@@ -1,105 +1,121 @@
-# TikTok TTS
+# TikTok TTS — Home Assistant Custom Integration
 
-[![GitHub Release][releases-shield]][releases]
-[![GitHub Activity][commits-shield]][commits]
-[![License][license-shield]](LICENSE)
+A Home Assistant custom integration that provides Text-to-Speech using TikTok's voice engine, supporting a wide range of languages and expressive voices.
 
-[![hacs][hacsbadge]][hacs]
-![Project Maintenance][maintenance-shield]
+---
 
-_Integration to use the [reverse engineered TikTok speech API by Weilbyte](https://weilbyte.github.io/tiktok-tts/)._
+## Credits & Attribution
 
-As @Weilbyte work is based on the following repository, I want to attribute them here as well.
+| Role | Person / Project | Link |
+|---|---|---|
+| **Original integration author** | Philipp Lüttecke | [philipp-luettecke/tiktoktts](https://github.com/philipp-luettecke/tiktoktts) |
+| **Community TTS proxy** | Weilbyte | [Weilbyte/tiktok-tts](https://github.com/Weilbyte/tiktok-tts) |
+| **Voice list reference** | oscie57 | [oscie57/tiktok-voice](https://github.com/oscie57/tiktok-voice) |
+| **Fork author** | Steven Fox | [sfox38/tiktoktts](https://github.com/sfox38/tiktoktts) |
 
-https://github.com/oscie57/tiktok-voice
+> [!NOTE]
+> This fork modernises the original integration for current Home Assistant versions, fixes some bugs, adds a UI config flow, direct API mode with endpoint fallback, automatic text chunking, and improves error handling.
 
-Visit their page and appreciate their work as well!
-
-**This integration will set up the following platforms.**
-
-Platform | Description
--- | --
-`tts` | Generate a audio file based on given input text to play over speakers.
+---
 
 ## Installation
 
-There are two methods to install this custom_integration.
+### HACS (Recommended)
 
-### Installation with HACS
-
-As this is a HACS component, you can simply add this repository [philipp-luettecke/tiktoktts](https://github.com/philipp-luettecke/tiktoktts) as custom repository to HACS and afterwards search for the TikTokTTS Integration.
-Now you can install it.
-
-1. Add `https://github.com/philipp-luettecke/tiktoktts` to HACS as custom repository
-1. Install `TikTokTTS`component
-1. Restart Home Assistant
-1. Now add `tiktoktts` as platform in your `configuration.yaml`
-
-```yaml
-tts:
-  - platform: tiktoktts
-```
-
+1. Open **HACS** in your Home Assistant sidebar.
+2. Click the three-dot menu (top right) and choose **Custom repositories**.
+3. Paste `https://github.com/sfox38/tiktoktts` and select **Integration** as the category.
+4. Click **Add**, then find **tiktoktts** in the HACS Integration list and click **Download**.
+5. Restart Home Assistant.
 
 ### Manual Installation
 
-1. Using the tool of choice open the directory (folder) for your HA configuration (where you find `configuration.yaml`).
-1. If you do not have a `custom_components` directory (folder) there, you need to create it.
-1. In the `custom_components` directory (folder) create a new folder called `tiktoktts`.
-1. Download _all_ the files from the `custom_components/tiktoktts/` directory (folder) in this repository.
-1. Place the files you downloaded in the new directory (folder) you created.
-1. Restart Home Assistant
-1. Now add `tiktoktts` as platform in your `configuration.yaml`
+1. Download the latest release zip from this repository and unpack it.
+2. Copy the `tiktoktts` folder into your `config/custom_components/` directory. The result should be `config/custom_components/tiktoktts/`.
+3. Restart Home Assistant.
+
+
+---
+
+## Configuration
+
+After restarting, go to **Settings -> Devices & Services -> Add Integration** and search for **TikTokTTS**.
+
+### Connection Modes
+
+#### Community Proxy (recommended)
+Uses the open-source proxy by [Weilbyte](https://github.com/Weilbyte/tiktok-tts). No TikTok account required. The default endpoint is `https://tiktok-tts.weilnet.workers.dev`.
+
+For better reliability, you can self-host your own proxy instance and enter its URL during setup. See the [Weilbyte repo](https://github.com/Weilbyte/tiktok-tts) for instructions.
+
+#### Direct API ⚠️
+Calls TikTok's internal API directly using your TikTok session cookie.
+
+> [!IMPORTANT]
+> This uses an unofficial, reverse-engineered API and may violate TikTok's Terms of Service. Use at your own risk.
+
+Requires a `sessionid` cookie from a logged-in TikTok browser session:
+1. Log in to TikTok in your browser
+2. Open Developer Tools (F12) -> Application → Cookies
+3. Copy the value of the `sessionid` cookie
+
+The integration will automatically try multiple regional TikTok endpoints if the primary one fails.
+
+---
+
+## Usage
+
+### tts.speak action
 
 ```yaml
-tts:
-  - platform: tiktoktts
-```
-
-## How to use
-
-After installing the integration you will be presented with a new Service `tiktoktts_say`.
-You can now call this service and add a option `voice` to select one of the voices available in `custom_component/tiktoktts/const.py`.
-
-I'm trying to keep the list equivalent to the voices available on the original [tiktok-voice](https://github.com/oscie57/tiktok-voice) rpositories [Wiki page](https://github.com/oscie57/tiktok-voice/wiki/Voice-Codes).
-
-```yaml
-service: tts.tiktoktts_say
+action: tts.speak
+target:
+  entity_id: tts.tiktoktts
 data:
-  cache: false
-  message: Sample Text
-  entity_id: media_player.<entity_id>
+  media_player_entity_id: media_player.your_speaker
+  message: "Hello, this is TikTok TTS"
+  language: en_us
   options:
-    voice: en_us_001
+    voice: en_us_007
 ```
 
-<!--1. In the HA UI go to "Configuration" -> "Integrations" click "+" and search for "TikTok TTS
+The `language` field filters available voices in the Automations editor UI. The `options.voice` field selects the specific voice. If you omit `options.voice`, the integration will use your configured default voice (if it matches the selected language) or the first available voice for the requested language.
 
-## Configuration is done in the UI
+### Supported Languages
 
-<!--->
+| Code | Language |
+|---|---|
+| `en_us` | English (US) |
+| `en_uk` | English (UK) |
+| `en_au` | English (AU) |
+| `fr` | French |
+| `de` | German |
+| `es` | Spanish |
+| `es_mx` | Spanish (Mexico) |
+| `pt_br` | Portuguese (Brazil) |
+| `id` | Indonesian |
+| `ja` | Japanese |
+| `ko` | Korean |
 
-## Contributions are welcome!
+### Changing the Default Voice
 
-If you want to contribute to this please read the [Contribution guidelines](CONTRIBUTING.md)
+Go to **Settings -> Devices & Services -> TikTok TTS -> Configure** (gear icon). Changes take effect immediately after saving, no restart required.
 
+---
 
+## Troubleshooting
 
-***
+### Proxy endpoint is unreliable
+The community Weilbyte proxy is a free, volunteer-run service and may occasionally be unavailable. For a more reliable setup, self-host your own proxy instance. See [Weilbyte/tiktok-tts](https://github.com/Weilbyte/tiktok-tts).
 
-[tiktoktts]: https://github.com/philipp-luettecke/tiktoktts
-[buymecoffee]: https://www.buymeacoffee.com/ludeeus
-[buymecoffeebadge]: https://img.shields.io/badge/buy%20me%20a%20coffee-donate-yellow.svg?style=for-the-badge
-[commits-shield]: https://img.shields.io/github/commit-activity/y/philipp-luettecke/tiktoktts.svg?style=for-the-badge
-[commits]: https://github.com/philipp-luettecke/tiktoktts/commits/main
-[hacs]: https://github.com/hacs/integration
-[hacsbadge]: https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge
-[discord]: https://discord.gg/Qa5fW2R
-[discord-shield]: https://img.shields.io/discord/330944238910963714.svg?style=for-the-badge
-[exampleimg]: example.png
-[forum-shield]: https://img.shields.io/badge/community-forum-brightgreen.svg?style=for-the-badge
-[forum]: https://community.home-assistant.io/
-[license-shield]: https://img.shields.io/github/license/philipp-luettecke/tiktoktts.svg?style=for-the-badge
-[maintenance-shield]: https://img.shields.io/badge/maintainer-Philipp%20Luettecke-blue.svg?style=for-the-badge
-[releases-shield]: https://img.shields.io/github/release/philipp-luettecke/tiktoktts.svg?style=for-the-badge
-[releases]: https://github.com/philipp-luettecke/tiktoktts/releases
+### Direct API: session_id expired
+TikTok session IDs expire periodically. If you see errors about an invalid or expired session ID, go to the integration options and update the value from your browser cookies.
+
+### Check the logs
+Go to **Settings -> System -> Logs** and filter for `tiktoktts` to see detailed error messages.
+
+---
+
+## Disclaimer
+
+This integration is not affiliated with, endorsed by, or connected to TikTok or ByteDance in any way. The direct API mode uses an unofficial, reverse-engineered endpoint. Use of the direct API mode may violate TikTok's Terms of Service.
