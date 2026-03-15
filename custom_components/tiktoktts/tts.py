@@ -37,7 +37,7 @@ Credits
 Original integration: Philipp Lüttecke (https://github.com/philipp-luettecke/tiktoktts)
 Community TTS proxy:  Weilbyte (https://github.com/Weilbyte/tiktok-tts)
 Voice list reference: oscie57 (https://github.com/oscie57/tiktok-voice)
-Fork author:          Steven Fox / sfox38 (https://github.com/sfox38/tiktoktts)
+Fork author:          Steve Fox / sfox38 (https://github.com/sfox38/tiktoktts)
 """
 from __future__ import annotations
 
@@ -118,7 +118,6 @@ class TikTokTTSEntity(TextToSpeechEntity):
     """
 
     _attr_has_entity_name = True
-    _attr_name = "TikTok TTS"
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
         """Store references — do not read config here.
@@ -127,12 +126,41 @@ class TikTokTTSEntity(TextToSpeechEntity):
         They are read live via @property methods below so that any change
         saved through the options UI is picked up immediately after reload,
         without needing to recreate the entity.
+
+        unique_id uses the config_entry.entry_id (a UUID assigned by HA at
+        setup time) so that multiple instances can coexist — e.g. one proxy
+        entry and one direct API entry. Using a hardcoded string like DOMAIN
+        would cause HA to silently discard any second instance as a duplicate.
+
+        The entity name is derived from _attr_name which is set dynamically
+        below based on the API mode, giving human-readable entity IDs:
+          - tts.tiktok_tts_proxy  (proxy mode)
+          - tts.tiktok_tts_direct (direct mode)
         """
         self.hass = hass
         self._config_entry = config_entry
-        # Use the domain string as the unique_id so HA generates a clean,
-        # predictable entity_id of "tts.tiktoktts" rather than a random UUID.
-        self._attr_unique_id = DOMAIN
+        # entry_id is a stable UUID assigned by HA — unique across all entries
+        self._attr_unique_id = config_entry.entry_id
+        # Lock the entity_id explicitly so it is always derived from the domain
+        # and mode suffix — not from the friendly name. This means renaming the
+        # friendly name in future will never silently break existing automations.
+        mode_suffix = API_MODE_DIRECT if config_entry.data.get(CONF_API_MODE) == API_MODE_DIRECT else API_MODE_PROXY
+        self.entity_id = f"tts.{DOMAIN}_{mode_suffix}"
+
+    @property
+    def name(self) -> str:
+        """Return the friendly (display) name shown in the HA UI.
+
+        The friendly name and entity ID are intentionally decoupled here:
+          - Friendly name: "TikTokTTS Direct" / "TikTokTTS Proxy"  (shown in UI)
+          - Entity ID:      tts.tiktoktts_direct / tts.tiktoktts_proxy  (locked below)
+
+        The entity_id is set explicitly in __init__ using a slugified version
+        of the mode suffix, so HA never re-derives it from this display name.
+        """
+        if self._api_mode == API_MODE_DIRECT:
+            return "TikTokTTS Direct"
+        return "TikTokTTS Proxy"
 
     # ------------------------------------------------------------------
     # Live config properties — always read from entry.data
