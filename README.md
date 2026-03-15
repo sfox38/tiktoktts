@@ -45,7 +45,7 @@ If you were using [philipp-luettecke/tiktoktts](https://github.com/philipp-luett
 | What changed | Original | This fork |
 |---|---|---|
 | **Configuration method** | `configuration.yaml` | UI config flow (Settings → Devices & Services) |
-| **Entity ID** | May vary | Always `tts.tiktoktts` |
+| **Entity ID** | May vary | Always `tts.tiktok_tts` |
 | **Default language** | `de` (German) | `en_us` (English US) |
 | **Default voice** | `de_001` | `en_us_001` |
 | **`platform:` entry in YAML** | Required | **Must be removed** |
@@ -117,7 +117,7 @@ The integration will automatically try multiple regional TikTok endpoints if the
 ```yaml
 action: tts.speak
 target:
-  entity_id: tts.tiktoktts
+  entity_id: tts.tiktok_tts
 data:
   media_player_entity_id: media_player.your_speaker
   message: "Hello, this is TikTok TTS"
