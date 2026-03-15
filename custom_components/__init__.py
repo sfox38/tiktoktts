@@ -49,7 +49,7 @@ Credits
 -------
 Original integration: Philipp Lüttecke (https://github.com/philipp-luettecke/tiktoktts)
 Community TTS proxy:  Weilbyte (https://github.com/Weilbyte/tiktok-tts)
-Fork author:          Steve Fox / sfox38 (https://github.com/sfox38/tiktoktts)
+Fork author:          Steven Fox / sfox38 (https://github.com/sfox38/tiktoktts)
 """
 from __future__ import annotations
 
