@@ -44,7 +44,7 @@ If you were using [philipp-luettecke/tiktoktts](https://github.com/philipp-luett
 
 | What changed | Original | This fork |
 |---|---|---|
-| **Configuration method** | `configuration.yaml` | UI config flow (Settings → Devices & Services) |
+| **Configuration method** | `configuration.yaml` | UI config flow (Settings -> Devices & Services) |
 | **Entity ID** | May vary | Always `tts.tiktok_tts` |
 | **Default language** | `de` (German) | `en_us` (English US) |
 | **Default voice** | `de_001` | `en_us_001` |
@@ -73,11 +73,11 @@ HA caches generated audio files and sometimes holds on to old entity state. Go t
 
 ### Step 4: Restart Home Assistant
 
-Go to **Settings -> System → Restart** and do a full restart (not Quick Reload).
+Go to **Settings -> System -> Restart** and do a full restart (not Quick Reload).
 
 ### Step 5: Install This Fork and Reconfigure
 
-Follow the [Installation](#installation) steps below. When you reach **Settings → Devices & Services → Add Integration**, you will go through the new UI setup wizard to reconfigure your endpoint and default voice.
+Follow the [Installation](#installation) steps below. When you reach **Settings -> Devices & Services -> Add Integration**, you will go through the new UI setup wizard to reconfigure your endpoint and default voice.
 
 > [!NOTE]
 > Any automations that used `tts.tiktoktts` with a `platform: tiktoktts` style service call will need to be updated to use the `tts.speak` action format shown in the [Usage](#usage) section below.
@@ -103,7 +103,7 @@ Calls TikTok's internal API directly using your TikTok session cookie.
 
 Requires a `sessionid` cookie from a logged-in TikTok browser session:
 1. Log in to TikTok in your browser
-2. Open Developer Tools (F12) -> Application → Cookies
+2. Open Developer Tools (F12) -> Application -> Cookies
 3. Copy the value of the `sessionid` cookie
 
 The integration will automatically try multiple regional TikTok endpoints if the primary one fails.
