@@ -45,7 +45,7 @@ If you were using [philipp-luettecke/tiktoktts](https://github.com/philipp-luett
 | What changed | Original | This fork |
 |---|---|---|
 | **Configuration method** | `configuration.yaml` | UI config flow (Settings -> Devices & Services) |
-| **Entity ID** | May vary | Always `tts.tiktok_tts` |
+| **Entity ID** | May vary | `tts.tiktoktts_proxy` (proxy mode) or `tts.tiktoktts_direct` (direct mode) |
 | **Default language** | `de` (German) | `en_us` (English US) |
 | **Default voice** | `de_001` | `en_us_001` |
 | **`platform:` entry in YAML** | Required | **Must be removed** |
@@ -69,7 +69,7 @@ In your `config/custom_components/` directory, delete the entire `tiktoktts/` fo
 
 ### Step 3: Clear the Old TTS Cache
 
-HA caches generated audio files and sometimes holds on to old entity state. Go to **Developer Tools -> Template** and confirm `tts.tiktoktts` no longer appears in **Developer Tools -> States**. If it does, click the entity and use the delete (bin) icon to remove it.
+HA caches generated audio files and sometimes holds on to old entity state. Go to **Developer Tools -> States** and confirm no `tiktoktts` entities remain. If any do, click each one and use the delete (bin) icon to remove them.
 
 ### Step 4: Restart Home Assistant
 
@@ -112,12 +112,37 @@ The integration will automatically try multiple regional TikTok endpoints if the
 
 ## Usage
 
+### Entity Names
+
+Each configured instance creates its own entity with a fixed ID based on the connection mode:
+
+| Mode | Friendly Name | Entity ID |
+|---|---|---|
+| Community Proxy | TikTokTTS Proxy | `tts.tiktoktts_proxy` |
+| Direct API | TikTokTTS Direct | `tts.tiktoktts_direct` |
+
+Both entities can coexist if you have configured both modes. Use the appropriate entity ID in your automations depending on which connection you want to use.
+
 ### tts.speak action
 
+**Proxy mode:**
 ```yaml
 action: tts.speak
 target:
-  entity_id: tts.tiktok_tts
+  entity_id: tts.tiktoktts_proxy
+data:
+  media_player_entity_id: media_player.your_speaker
+  message: "Hello, this is TikTok TTS"
+  language: en_us
+  options:
+    voice: en_us_007
+```
+
+**Direct API mode:**
+```yaml
+action: tts.speak
+target:
+  entity_id: tts.tiktoktts_direct
 data:
   media_player_entity_id: media_player.your_speaker
   message: "Hello, this is TikTok TTS"
