@@ -110,6 +110,21 @@ The integration will automatically try multiple regional TikTok endpoints if the
 
 ---
 
+## Voice Examples
+
+These samples were generated using TikTok TTS with a selection of English voices.
+
+| Sample | Voice ID |
+|---|---|
+| [▶ Listen](https://raw.githubusercontent.com/sfox38/tiktoktts/main/examples/joke1.mp3) | `en_us_rocket` |
+| [▶ Listen](https://raw.githubusercontent.com/sfox38/tiktoktts/main/examples/joke2.mp3) | `en_male_narration` |
+| [▶ Listen](https://raw.githubusercontent.com/sfox38/tiktoktts/main/examples/joke3.mp3) | `en_us_ghostface` |
+| [▶ Listen](https://raw.githubusercontent.com/sfox38/tiktoktts/main/examples/joke4.mp3) | `en_us_006` |
+| [▶ Listen](https://raw.githubusercontent.com/sfox38/tiktoktts/main/examples/joke5.mp3) | `en_male_m03_lobby` |
+| [▶ Listen](https://raw.githubusercontent.com/sfox38/tiktoktts/main/examples/joke6.mp3) | `en_female_emotional` | 
+
+---
+
 ## Usage
 
 ### Entity Names
