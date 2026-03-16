@@ -102,7 +102,7 @@ Calls TikTok's internal API directly using your TikTok session cookie.
 > This uses an unofficial, reverse-engineered API and may violate TikTok's Terms of Service. Use at your own risk.
 
 Requires a `sessionid` cookie from a logged-in TikTok browser session:
-1. Log in to TikTok in your browser
+1. **Log in** to TikTok in your browser (you must have a TikTok account!)
 2. Open Developer Tools (F12) -> Application -> Cookies
 3. Copy the value of the `sessionid` cookie
 
