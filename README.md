@@ -112,7 +112,8 @@ The integration will automatically try multiple regional TikTok endpoints if the
 
 ## Voice Examples
 
-These samples were generated using TikTok TTS with a selection of English voices.
+These samples were generated using TikTok TTS with a selection of English voices.  
+_Github doesn't support in-line audio, you will need to download these mp3 files first._
 
 | Sample | Voice ID |
 |---|---|
