@@ -110,22 +110,6 @@ The integration will automatically try multiple regional TikTok endpoints if the
 
 ---
 
-## Voice Examples
-
-These samples were generated using TikTok TTS with a selection of English voices.  
-_Github doesn't support in-line audio, you will need to download these mp3 files first._
-
-| Sample | Voice ID |
-|---|---|
-| [▶ Listen](https://raw.githubusercontent.com/sfox38/tiktoktts/main/examples/joke1.mp3) | `en_us_rocket` |
-| [▶ Listen](https://raw.githubusercontent.com/sfox38/tiktoktts/main/examples/joke2.mp3) | `en_male_narration` |
-| [▶ Listen](https://raw.githubusercontent.com/sfox38/tiktoktts/main/examples/joke3.mp3) | `en_us_ghostface` |
-| [▶ Listen](https://raw.githubusercontent.com/sfox38/tiktoktts/main/examples/joke4.mp3) | `en_us_006` |
-| [▶ Listen](https://raw.githubusercontent.com/sfox38/tiktoktts/main/examples/joke5.mp3) | `en_male_m03_lobby` |
-| [▶ Listen](https://raw.githubusercontent.com/sfox38/tiktoktts/main/examples/joke6.mp3) | `en_female_emotional` | 
-
----
-
 ## Usage
 
 ### Entity Names
@@ -167,7 +151,25 @@ data:
     voice: en_us_007
 ```
 
-The `language` field filters available voices in the Automations editor UI. The `options.voice` field selects the specific voice. If you omit `options.voice`, the integration will use your configured default voice (if it matches the selected language) or the first available voice for the requested language.
+The `language` field filters available voices in the Automations editor UI, although it is recommended not to use this field at all. The `options.voice` field selects the specific voice. If you omit `options.voice`, the integration will use your configured default voice (if it matches the selected language) or the first available voice for the requested language.
+
+> [!NOTE]
+> The voices currently supported by this integration represent the entire confirmed working set as of early 2026. TikTok's internal API supports many additional voices beyond this list, but their exact API IDs are not publicly documented, and some voices may be locale specific, so they cannot be reliably determined. If you discover a working voice ID that is not already in our list, please [submit a new Issue here](https://github.com/sfox38/tiktoktts/issues) and I can add it to the next release.
+
+### Voice Examples
+
+These samples were generated using TikTok TTS with a selection of English voices.  
+_Github doesn't support in-line audio, you will need to download these mp3 files first._
+
+| Sample | Voice ID |
+|---|---|
+| [▶ Listen](https://raw.githubusercontent.com/sfox38/tiktoktts/main/examples/joke1.mp3) | `en_us_rocket` |
+| [▶ Listen](https://raw.githubusercontent.com/sfox38/tiktoktts/main/examples/joke2.mp3) | `en_male_narration` |
+| [▶ Listen](https://raw.githubusercontent.com/sfox38/tiktoktts/main/examples/joke3.mp3) | `en_us_ghostface` |
+| [▶ Listen](https://raw.githubusercontent.com/sfox38/tiktoktts/main/examples/joke4.mp3) | `en_us_006` |
+| [▶ Listen](https://raw.githubusercontent.com/sfox38/tiktoktts/main/examples/joke5.mp3) | `en_male_m03_lobby` |
+| [▶ Listen](https://raw.githubusercontent.com/sfox38/tiktoktts/main/examples/joke6.mp3) | `en_female_emotional` | 
+
 
 ### Supported Languages
 
