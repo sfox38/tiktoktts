@@ -9,7 +9,7 @@ LOGGER: Logger = getLogger(__package__)
 
 NAME = "TikTok TTS"
 DOMAIN = "tiktoktts"
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 # ---------------------------------------------------------------------------
 # Attribution & credits
@@ -24,7 +24,7 @@ FORK_REPO = "https://github.com/sfox38/tiktoktts"
 PROXY_AUTHOR = "Weilbyte"
 PROXY_REPO = "https://github.com/Weilbyte/tiktok-tts"
 PROXY_ATTRIBUTION = (
-    f"Community TTS proxy by {PROXY_AUTHOR} — {PROXY_REPO}. "
+    f"Community TTS proxy by {PROXY_AUTHOR} - {PROXY_REPO}. "
     "Self-hosting your own instance is recommended for reliability."
 )
 
@@ -60,7 +60,7 @@ API_MODE_DIRECT = "direct"
 # Proxy API
 # ---------------------------------------------------------------------------
 
-# Default community proxy — operated by Weilbyte, may be unreliable.
+# Default community proxy - operated by Weilbyte, may be unreliable.
 # Users can self-host from: https://github.com/Weilbyte/tiktok-tts
 DEFAULT_PROXY_ENDPOINT = "https://tiktok-tts.weilnet.workers.dev"
 
@@ -75,13 +75,42 @@ PROXY_API_FIELD_AVAILABLE = "available"
 # Direct TikTok API (unofficial, reverse-engineered)
 # ---------------------------------------------------------------------------
 
-# Known regional endpoints — the configured one is tried first,
-# remaining ones are used as automatic fallback.
+# Known regional endpoints - the configured one is tried first,
+# remaining ones are used as automatic fallback in the order listed.
+#
+# Endpoint naming convention: api{version}-{type}-{region}.tiktokv.com
+#   version : 16, 19, 22 - TikTok server generation (higher = newer)
+#   type    : normal, core - server role within the cluster
+#   region  : useast1a, useast2a, useast5 (US), alisg (Singapore)
+#
+# Regional notes:
+#   useast*  - US East servers, most commonly referenced in the community
+#   alisg    - Singapore, lowest latency for Southeast Asia and Oceania
+#
+# Higher-generation endpoints (api19, api22) may support newer voices
+# that api16 endpoints do not. Unresponsive endpoints are skipped
+# automatically by the retry/fallback logic in tts.py.
 DIRECT_API_ENDPOINTS = [
+    # --- US East (primary, most reliable) ---
     "https://api16-normal-c-useast1a.tiktokv.com",
     "https://api16-normal-useast5.us.tiktokv.com",
+    "https://api16-core-useast5.us.tiktokv.com",
+    "https://api16-core-c-useast1a.tiktokv.com",
+    "https://api16-normal-c-useast2a.tiktokv.com",
+
+    # --- US East (newer API generations) ---
+    "https://api19-normal-c-useast1a.tiktokv.com",
+    "https://api19-core-c-useast1a.tiktokv.com",
+    "https://api22-core-c-alisg.tiktokv.com",
+
+    # --- Generic / load-balanced ---
     "https://api16-core.tiktokv.com",
+    "https://api-core.tiktokv.com",
+    "https://api-normal.tiktokv.com",
+
+    # --- Singapore (best for Southeast Asia / Oceania) ---
     "https://api16-normal-c-alisg.tiktokv.com",
+    "https://api16-core-c-alisg.tiktokv.com",
 ]
 
 DIRECT_API_PATH = "/media/api/text/speech/invoke/"
@@ -140,89 +169,310 @@ DEFAULT_API_MODE = API_MODE_PROXY
 
 # ---------------------------------------------------------------------------
 # Supported voices
-# Source: https://github.com/oscie57/tiktok-voice
+# All voices confirmed working as of early 2026 (duplicates removed).
+# Sources:
+#   https://github.com/oscie57/tiktok-voice
+#   https://github.com/oscie57/tiktok-voice/issues/1
+#   https://github.com/mark-rez/TikTok-Voice-TTS
 # ---------------------------------------------------------------------------
 
-SUPPORTED_VOICES = [
-    # --- DISNEY / CHARACTER VOICES ---
-    "en_us_ghostface",       # Ghost Face (Scream)
-    "en_us_chewbacca",       # Chewbacca
-    "en_us_c3po",            # C3PO
-    "en_us_stitch",          # Stitch
-    "en_us_stormtrooper",    # Stormtrooper
-    "en_us_rocket",          # Rocket Raccoon
 
-    # --- ENGLISH VOICES ---
-    "en_au_001",             # English AU - Female
-    "en_au_002",             # English AU - Male
-    "en_uk_001",             # English UK - Male 1
-    "en_uk_003",             # English UK - Male 2
-    "en_us_001",             # English US - Female (Int. 1)
-    "en_us_002",             # English US - Female (Int. 2)
-    "en_us_006",             # English US - Male 1
-    "en_us_007",             # English US - Male 2
-    "en_us_009",             # English US - Male 3
-    "en_us_010",             # English US - Male 4
-
-    # --- EUROPEAN VOICES ---
-    "fr_001",                # French - Male 1
-    "fr_002",                # French - Male 2
-    "de_001",                # German - Female
-    "de_002",                # German - Male
-    "es_002",                # Spanish - Male
-    "es_mx_002",             # Spanish MX - Male
-
-    # --- PORTUGUESE (BRAZIL) ---
-    "br_001",                # Portuguese BR - Female 1
-    "br_003",                # Portuguese BR - Female 2
-    "br_004",                # Portuguese BR - Female 3
-    "br_005",                # Portuguese BR - Male
-
-    # --- ASIAN VOICES ---
-    "id_001",                # Indonesian - Female
-    "jp_001",                # Japanese - Female 1
-    "jp_003",                # Japanese - Female 2
-    "jp_005",                # Japanese - Female 3
-    "jp_006",                # Japanese - Male
-    "kr_002",                # Korean - Male 1
-    "kr_003",                # Korean - Female
-    "kr_004",                # Korean - Male 2
-
-    # --- SINGING / EXPRESSIVE VOICES ---
-    "en_female_f08_salut_damour",   # Alto
-    "en_male_m03_lobby",            # Tenor
-    "en_female_f08_warmy_breeze",   # Warmy Breeze
-    "en_male_m03_sunshine_soon",    # Sunshine Soon
-
-    # --- OTHER / NARRATOR VOICES ---
-    "en_male_narration",     # Narrator
-    "en_male_funny",         # Wacky
-    "en_female_emotional",   # Peaceful / Emotional
-]
-
-# Maps language codes to the voices that belong to that language
+# Maps language codes to voices - used by async_get_supported_voices() to
+# filter the voice dropdown in the Automations editor when a language is selected.
 VOICES_BY_LANGUAGE: dict[str, list[str]] = {
     "en_us": [
-        "en_us_001", "en_us_002", "en_us_006", "en_us_007",
-        "en_us_009", "en_us_010",
-        "en_us_ghostface", "en_us_chewbacca", "en_us_c3po",
-        "en_us_stitch", "en_us_stormtrooper", "en_us_rocket",
-        "en_female_f08_salut_damour", "en_male_m03_lobby",
-        "en_female_f08_warmy_breeze", "en_male_m03_sunshine_soon",
-        "en_male_narration", "en_male_funny", "en_female_emotional",
+        "en_female_betty",
+        "en_female_grandma",
+        "en_female_makeup",
+        "en_female_pansino",
+        "en_female_richgirl",
+        "en_female_samc",
+        "en_female_shenna",
+        "en_male_cody",
+        "en_male_cupid",
+        "en_male_deadpool",
+        "en_male_funny",
+        "en_male_grinch",
+        "en_male_jomboy",
+        "en_male_narration",
+        "en_male_santa",
+        "en_male_santa_effect",
+        "en_male_santa_narration",
+        "en_male_trevor",
+        "en_male_wizard",
+        "en_us_001",
+        "en_us_006",
+        "en_us_007",
+        "en_us_009",
+        "en_us_010",
     ],
-    "en_uk": ["en_uk_001", "en_uk_003"],
-    "en_au": ["en_au_001", "en_au_002"],
+    "en_uk": [
+        "en_female_emotional",
+        "en_male_ashmagic",
+        "en_male_jarvis",
+        "en_male_olantekkers",
+        "en_male_ukbutler",
+        "en_male_ukneighbor",
+        "en_uk_001",
+        "en_uk_003",
+    ],
+    "en_au": [
+        "en_au_001",
+        "en_au_002",
+    ],
+    "disney": [
+        "en_female_madam_leota",
+        "en_male_ghosthost",
+        "en_male_pirate",
+        "en_us_c3po",
+        "en_us_chewbacca",
+        "en_us_ghostface",
+        "en_us_rocket",
+        "en_us_stitch",
+        "en_us_stormtrooper",
+    ],
+    "music": [
+        "en_female_f08_salut_damour",
+        "en_female_f08_twinkle",
+        "en_female_f08_warmy_breeze",
+        "en_female_ht_f08_glorious",
+        "en_female_ht_f08_halloween",
+        "en_female_ht_f08_newyear",
+        "en_female_ht_f08_wonderful_world",
+        "en_male_m03_classical",
+        "en_male_m03_lobby",
+        "en_male_m03_sunshine_soon",
+        "en_male_m2_xhxs_m03_christmas",
+        "en_male_m2_xhxs_m03_silly",
+        "en_male_sing_deep_jingle",
+        "en_male_sing_funny_it_goes_up",
+        "en_male_sing_funny_thanksgiving",
+    ],
     "fr":    ["fr_001", "fr_002"],
+    "it":    ["it_male_m18"],
+    "es":    ["es_002", "es_female_f6", "es_female_fp1", "es_male_m3"],
+    "es_mx": ["es_mx_002", "es_mx_female_supermom"],
     "de":    ["de_001", "de_002"],
-    "es":    ["es_002"],
-    "es_mx": ["es_mx_002"],
-    "pt_br": ["br_001", "br_003", "br_004", "br_005"],
-    "id":    ["id_001"],
-    "ja":    ["jp_001", "jp_003", "jp_005", "jp_006"],
+    "pt_br": [
+        "bp_female_ivete",
+        "bp_female_ludmilla",
+        "br_003",
+        "br_004",
+        "br_005",
+    ],
+    "pt_pt": ["pt_female_laizza", "pt_female_lhays", "pt_male_bueno"],
+    "id":    ["id_female_icha", "id_female_noor", "id_male_darma", "id_male_putra"],
+    "ja":    [
+        "jp_001",
+        "jp_003",
+        "jp_005",
+        "jp_006",
+        "jp_female_fujicochan",
+        "jp_female_hasegawariona",
+        "jp_female_kaorishoji",
+        "jp_female_machikoriiita",
+        "jp_female_oomaeaika",
+        "jp_female_rei",
+        "jp_female_shirou",
+        "jp_female_yagishaki",
+        "jp_male_hikakin",
+        "jp_male_keiichinakano",
+        "jp_male_matsudake",
+        "jp_male_matsuo",
+        "jp_male_osada",
+        "jp_male_shuichiro",
+        "jp_male_tamawakazuki",
+        "jp_male_yujinchigusa",
+    ],
     "ko":    ["kr_002", "kr_003", "kr_004"],
+    "vi":    ["BV074_streaming", "BV075_streaming"],
 }
 
 SUPPORTED_LANGUAGES = list(VOICES_BY_LANGUAGE.keys())
 
-SUPPORTED_OPTIONS = [CONF_VOICE]
+
+# ---------------------------------------------------------------------------
+# Friendly name mappings for UI display
+# Used by select.py to show human-readable labels in the language and voice
+# dropdowns instead of raw API codes.
+# ---------------------------------------------------------------------------
+
+LANGUAGE_NAMES: dict[str, str] = {
+    "en_us":  "🇺🇸 English (US)",
+    "en_uk":  "🇬🇧 English (UK)",
+    "en_au":  "🇦🇺 English (AU)",
+    "disney": "🎭 Disney / Character",
+    "music":  "🎵 Music / Singing",
+    "fr":     "🇫🇷 French",
+    "it":     "🇮🇹 Italian",
+    "es":     "🇪🇸 Spanish",
+    "es_mx":  "🇲🇽 Spanish (Mexico)",
+    "de":     "🇩🇪 German",
+    "pt_br":  "🇧🇷 Portuguese (Brazil)",
+    "pt_pt":  "🇵🇹 Portuguese (Portugal)",
+    "id":     "🇮🇩 Indonesian",
+    "ja":     "🇯🇵 Japanese",
+    "ko":     "🇰🇷 Korean",
+    "vi":     "🇻🇳 Vietnamese",
+}
+
+VOICE_NAMES: dict[str, str] = {
+    "bp_female_ivete":                  "Ivete Sangalo",
+    "bp_female_ludmilla":               "Ludmilla",
+    "br_003":                           "Júlia",
+    "br_004":                           "Ana",
+    "br_005":                           "Lucas",
+    "BV074_streaming":                  "Vietnamese - Female",
+    "BV075_streaming":                  "Vietnamese - Male",
+    "de_001":                           "German - Female",
+    "de_002":                           "German - Male",
+    "en_au_001":                        "Metro",
+    "en_au_002":                        "Smooth",
+    "en_female_betty":                  "Bae",
+    "en_female_emotional":              "Peaceful",
+    "en_female_f08_salut_damour":       "Cottagecore",
+    "en_female_f08_twinkle":            "Pop Lullaby",
+    "en_female_f08_warmy_breeze":       "Open Mic",
+    "en_female_grandma":                "Granny",
+    "en_female_ht_f08_glorious":        "Euphoric",
+    "en_female_ht_f08_halloween":       "Opera",
+    "en_female_ht_f08_newyear":         "NYE 2023",
+    "en_female_ht_f08_wonderful_world": "Melodrama",
+    "en_female_madam_leota":            "Madame Leota",
+    "en_female_makeup":                 "Beauty Guru",
+    "en_female_pansino":                "Varsity",
+    "en_female_richgirl":               "Bestie",
+    "en_female_samc":                   "Empathetic",
+    "en_female_shenna":                 "Debutante",
+    "en_male_ashmagic":                 "Ash Magic",
+    "en_male_cody":                     "Serious",
+    "en_male_cupid":                    "Cupid",
+    "en_male_deadpool":                 "Mr. GoodGuy",
+    "en_male_funny":                    "Wacky",
+    "en_male_ghosthost":                "Ghost Host",
+    "en_male_grinch":                   "Trickster",
+    "en_male_jarvis":                   "Alfred",
+    "en_male_jomboy":                   "Game On",
+    "en_male_m03_classical":            "Classic Electric",
+    "en_male_m03_lobby":                "Jingle",
+    "en_male_m03_sunshine_soon":        "Toon Beat",
+    "en_male_m2_xhxs_m03_christmas":    "Cozy",
+    "en_male_m2_xhxs_m03_silly":        "Quirky Time",
+    "en_male_narration":                "Story Teller",
+    "en_male_olantekkers":              "Olan Tekkers",
+    "en_male_pirate":                   "Pirate",
+    "en_male_santa":                    "Santa",
+    "en_male_santa_effect":             "Santa (with effect)",
+    "en_male_santa_narration":          "Author",
+    "en_male_sing_deep_jingle":         "Caroler",
+    "en_male_sing_funny_it_goes_up":    "Hypetrain",
+    "en_male_sing_funny_thanksgiving":  "Thanksgiving",
+    "en_male_trevor":                   "Marty",
+    "en_male_ukbutler":                 "Mr. Meticulous",
+    "en_male_ukneighbor":               "Lord Cringe",
+    "en_male_wizard":                   "Magician",
+    "en_uk_001":                        "Narrator",
+    "en_uk_003":                        "Male English UK",
+    "en_us_001":                        "Jessie",
+    "en_us_006":                        "Joey",
+    "en_us_007":                        "Professor",
+    "en_us_009":                        "Scientist",
+    "en_us_010":                        "Confidence",
+    "en_us_c3po":                       "C3PO",
+    "en_us_chewbacca":                  "Chewbacca",
+    "en_us_ghostface":                  "Scream",
+    "en_us_rocket":                     "Rocket",
+    "en_us_stitch":                     "Stitch",
+    "en_us_stormtrooper":               "Stormtrooper",
+    "es_002":                           "Spanish - Male",
+    "es_female_f6":                     "Alejandra",
+    "es_female_fp1":                    "Mariana",
+    "es_male_m3":                       "Julio",
+    "es_mx_002":                        "Álex",
+    "es_mx_female_supermom":            "Super Mamá",
+    "fr_001":                           "French - Male 1",
+    "fr_002":                           "French - Male 2",
+    "id_female_icha":                   "Icha",
+    "id_female_noor":                   "Noor",
+    "id_male_darma":                    "Darma",
+    "id_male_putra":                    "Putra",
+    "it_male_m18":                      "Italian Male",
+    "jp_001":                           "Miho (美穂)",
+    "jp_003":                           "Keiko (恵子)",
+    "jp_005":                           "Sakura (さくら)",
+    "jp_006":                           "Naoki (直樹)",
+    "jp_female_fujicochan":             "りーさ",
+    "jp_female_hasegawariona":          "世羅鈴",
+    "jp_female_kaorishoji":             "庄司果織",
+    "jp_female_machikoriiita":          "まちこりーた",
+    "jp_female_oomaeaika":              "夏絵ココ",
+    "jp_female_rei":                    "丸山礼",
+    "jp_female_shirou":                 "四郎",
+    "jp_female_yagishaki":              "八木沙季",
+    "jp_male_hikakin":                  "ヒカキン",
+    "jp_male_keiichinakano":            "Morio's Kitchen",
+    "jp_male_matsudake":                "マツダ家の日常",
+    "jp_male_matsuo":                   "モジャオ",
+    "jp_male_osada":                    "モリスケ",
+    "jp_male_shuichiro":                "修一朗",
+    "jp_male_tamawakazuki":             "玉川寿紀",
+    "jp_male_yujinchigusa":             "低音ボイス",
+    "kr_002":                           "Korean - Male 1",
+    "kr_003":                           "Korean - Female",
+    "kr_004":                           "Korean - Male 2",
+    "pt_female_laizza":                 "Laizza",
+    "pt_female_lhays":                  "Lhays Macedo",
+    "pt_male_bueno":                    "Galvão Bueno",
+}
+
+# ---------------------------------------------------------------------------
+# Shared entity names and IDs
+# ---------------------------------------------------------------------------
+
+ENTITY_NAME_LANGUAGE  = "TikTokTTS Language"
+ENTITY_NAME_VOICE     = "TikTokTTS Voice"
+ENTITY_NAME_DEVICE    = "TikTokTTS Device"
+ENTITY_NAME_MESSAGE   = "TikTokTTS Message"
+ENTITY_NAME_SPEAK     = "TikTokTTS Speak"
+
+ENTITY_ID_LANGUAGE    = f"select.{DOMAIN}_language"
+ENTITY_ID_VOICE       = f"select.{DOMAIN}_voice"
+ENTITY_ID_DEVICE      = f"select.{DOMAIN}_device"
+ENTITY_ID_MESSAGE     = f"text.{DOMAIN}_message"
+ENTITY_ID_SPEAK       = f"button.{DOMAIN}_speak"
+
+ENTITY_ID_TTS_PROXY   = f"tts.{DOMAIN}_{API_MODE_PROXY}"
+ENTITY_ID_TTS_DIRECT  = f"tts.{DOMAIN}_{API_MODE_DIRECT}"
+
+# Unique IDs for singleton entities
+UNIQUE_ID_LANGUAGE    = f"{DOMAIN}_language"
+UNIQUE_ID_VOICE       = f"{DOMAIN}_voice"
+UNIQUE_ID_DEVICE      = f"{DOMAIN}_device"
+UNIQUE_ID_MESSAGE     = f"{DOMAIN}_message"
+UNIQUE_ID_SPEAK       = f"{DOMAIN}_speak"
+
+# hass.data[DOMAIN] keys for singleton creation tracking
+HASS_DATA_SELECT_CREATED = "shared_select_created"
+HASS_DATA_TEXT_CREATED   = "shared_text_created"
+HASS_DATA_BUTTON_CREATED = "shared_button_created"
+
+# Placeholder shown in device/voice dropdowns before data is loaded
+PLACEHOLDER_LOADING = "(loading...)"
+PLACEHOLDER_NO_DEVICES = "(none available - restart HA)"
+
+# ---------------------------------------------------------------------------
+# TTS service call constants
+# ---------------------------------------------------------------------------
+
+TTS_SERVICE_DOMAIN         = "tts"
+TTS_SERVICE_SPEAK          = "speak"
+TTS_SERVICE_FIELD_PLAYER   = "media_player_entity_id"
+TTS_SERVICE_FIELD_MESSAGE  = "message"
+TTS_SERVICE_FIELD_CACHE    = "cache"
+TTS_SERVICE_FIELD_OPTIONS  = "options"
+TTS_SERVICE_FIELD_VOICE    = "voice"
+
+# Special "all languages" option for the language select dropdown.
+# When selected, the voice dropdown shows every voice from all languages.
+LANGUAGE_ALL_CODE = "all"
+LANGUAGE_ALL_NAME = "🌐 All Languages"

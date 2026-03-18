@@ -2,11 +2,11 @@
 
 This file implements two HA flow classes:
 
-  TikTokTTSConfigFlow  — the initial setup wizard, shown when the user clicks
+  TikTokTTSConfigFlow  - the initial setup wizard, shown when the user clicks
                          "+ Add Integration" and selects TikTok TTS.
-                         Steps: user (choose mode) → proxy or direct (configure).
+                         Steps: user (choose mode) -> proxy or direct (configure).
 
-  TikTokTTSOptionsFlow — the reconfigure screen, shown when the user clicks the
+  TikTokTTSOptionsFlow - the reconfigure screen, shown when the user clicks the
                          gear icon on an already-configured integration.
                          Single step: init (edit endpoint/session_id/voice).
 
@@ -15,13 +15,13 @@ at setup time with a user-friendly error message rather than silently at runtime
 
 Storage convention
 ------------------
-All settings are stored in entry.data (not entry.options). This is intentional —
+All settings are stored in entry.data (not entry.options). This is intentional -
 it keeps a single source of truth that tts.py reads from via self._config_entry.data.
 The options flow writes changes back to entry.data via async_update_entry(), then
 returns an empty async_create_entry() to close the flow. The update listener in
 __init__.py detects the data change and reloads the integration automatically.
 
-Error key → UI message mapping is defined in strings.json / translations/en.json.
+Error key -> UI message mapping is defined in strings.json / translations/en.json.
 """
 from __future__ import annotations
 
@@ -59,7 +59,7 @@ from .const import (
     LOGGER,
     PROXY_API_FIELD_AVAILABLE,
     PROXY_API_PATH_STATUS,
-    SUPPORTED_VOICES,
+    VOICES_BY_LANGUAGE,
 )
 
 # Timeout (seconds) used only during connection tests in this file.
@@ -87,14 +87,14 @@ async def _test_proxy_endpoint(hass: HomeAssistant, endpoint: str) -> str | None
             if resp.status == 200:
                 data = await resp.json()
                 if data.get("data", {}).get(PROXY_API_FIELD_AVAILABLE) is True:
-                    return None       # Success — endpoint is up and available
+                    return None       # Success - endpoint is up and available
                 return "endpoint_unavailable"
             return "endpoint_bad_status"
     except asyncio.TimeoutError:
         return "endpoint_timeout"
     except aiohttp.ClientError:
         return "endpoint_connection_error"
-    except Exception:  # noqa: BLE001 — catch-all so the flow never crashes
+    except Exception:  # noqa: BLE001 - catch-all so the flow never crashes
         return "endpoint_unknown_error"
 
 
@@ -117,7 +117,7 @@ async def _test_direct_endpoint(
         "User-Agent": DIRECT_API_USER_AGENT,
         "Cookie": f"sessionid={session_id}",
     }
-    # Minimal payload — single word to keep the test fast and cheap
+    # Minimal payload - single word to keep the test fast and cheap
     params = {
         DIRECT_API_PARAM_SPEAKER: DEFAULT_VOICE,
         DIRECT_API_PARAM_TEXT: "test",
@@ -134,7 +134,7 @@ async def _test_direct_endpoint(
             if resp.status == 200:
                 data = await resp.json()
                 if data.get("status_code") == DIRECT_API_STATUS_OK:
-                    return None   # Success — endpoint accepted the session_id
+                    return None   # Success - endpoint accepted the session_id
                 LOGGER.debug(
                     "Direct API test rejected: %s", data.get("status_msg", "unknown")
                 )
@@ -155,9 +155,9 @@ async def _test_direct_endpoint(
 class TikTokTTSConfigFlow(ConfigFlow, domain=DOMAIN):
     """Multi-step config flow for initial integration setup.
 
-    Step 1 — async_step_user:   user chooses proxy or direct mode.
-    Step 2a — async_step_proxy: user enters proxy URL and default voice.
-    Step 2b — async_step_direct: user enters TikTok endpoint, session_id, and voice.
+    Step 1 - async_step_user:   user chooses proxy or direct mode.
+    Step 2a - async_step_proxy: user enters proxy URL and default voice.
+    Step 2b - async_step_direct: user enters TikTok endpoint, session_id, and voice.
 
     The VERSION class attribute controls config entry migration. Increment it
     and add an async_migrate_entry() function in __init__.py if you ever change
@@ -188,7 +188,7 @@ class TikTokTTSConfigFlow(ConfigFlow, domain=DOMAIN):
                         {
                             API_MODE_PROXY: "Community Proxy (recommended, no account needed)",
                             API_MODE_DIRECT: (
-                                "Direct TikTok API (requires TikTok account session ID — "
+                                "Direct TikTok API (requires TikTok account session ID - "
                                 "may violate TikTok ToS)"
                             ),
                         }
@@ -229,7 +229,7 @@ class TikTokTTSConfigFlow(ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_ENDPOINT, default=DEFAULT_ENDPOINT): cv.string,
-                    vol.Required(CONF_VOICE, default=DEFAULT_VOICE): vol.In(SUPPORTED_VOICES),
+                    vol.Required(CONF_VOICE, default=DEFAULT_VOICE): vol.In([v for codes in VOICES_BY_LANGUAGE.values() for v in codes]),
                 }
             ),
             errors=errors,
@@ -273,7 +273,7 @@ class TikTokTTSConfigFlow(ConfigFlow, domain=DOMAIN):
                         DIRECT_API_ENDPOINTS
                     ),
                     vol.Required(CONF_SESSION_ID): cv.string,
-                    vol.Required(CONF_VOICE, default=DEFAULT_VOICE): vol.In(SUPPORTED_VOICES),
+                    vol.Required(CONF_VOICE, default=DEFAULT_VOICE): vol.In([v for codes in VOICES_BY_LANGUAGE.values() for v in codes]),
                 }
             ),
             errors=errors,
@@ -295,7 +295,7 @@ class TikTokTTSOptionsFlow(OptionsFlow):
     """Reconfigure flow shown when the user clicks the gear icon.
 
     Single step (init) that lets the user change the endpoint URL, session_id
-    (direct mode only), or default voice — without having to delete and re-add
+    (direct mode only), or default voice - without having to delete and re-add
     the integration.
 
     Important HA quirk: do NOT define __init__ or assign self.config_entry here.
@@ -327,7 +327,7 @@ class TikTokTTSOptionsFlow(OptionsFlow):
         """
         errors: dict[str, str] = {}
 
-        # entry.data is always the source of truth — read current values from there
+        # entry.data is always the source of truth - read current values from there
         current = self.config_entry.data
         api_mode = current.get(CONF_API_MODE, API_MODE_PROXY)
 
@@ -351,7 +351,7 @@ class TikTokTTSOptionsFlow(OptionsFlow):
                     self.config_entry, data=updated_data
                 )
                 # Close the options flow. The actual data was already persisted
-                # above — this empty entry just signals "flow is done".
+                # above - this empty entry just signals "flow is done".
                 return self.async_create_entry(title="", data={})
 
         # Build the form schema, choosing fields appropriate to the current mode.
@@ -367,7 +367,7 @@ class TikTokTTSOptionsFlow(OptionsFlow):
                     vol.Required(
                         CONF_VOICE,
                         default=current.get(CONF_VOICE, DEFAULT_VOICE),
-                    ): vol.In(SUPPORTED_VOICES),
+                    ): vol.In([v for codes in VOICES_BY_LANGUAGE.values() for v in codes]),
                 }
             )
         else:
@@ -384,7 +384,7 @@ class TikTokTTSOptionsFlow(OptionsFlow):
                     vol.Required(
                         CONF_VOICE,
                         default=current.get(CONF_VOICE, DEFAULT_VOICE),
-                    ): vol.In(SUPPORTED_VOICES),
+                    ): vol.In([v for codes in VOICES_BY_LANGUAGE.values() for v in codes]),
                 }
             )
 
