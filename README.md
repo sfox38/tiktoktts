@@ -2,7 +2,8 @@
 
 A Home Assistant custom integration that provides Text-to-Speech using TikTok's voice engine, supporting a wide range of languages and expressive voices.
 
----
+<img src="https://github.com/sfox38/tiktoktts/blob/main/examples/dash-custom.jpg" width="50%" alttext="dashbaord">
+
 
 ## Credits & Attribution
 
@@ -14,31 +15,19 @@ A Home Assistant custom integration that provides Text-to-Speech using TikTok's 
 | **Fork author** | Steven Fox | [sfox38/tiktoktts](https://github.com/sfox38/tiktoktts) |
 
 > [!NOTE]
-> This fork modernises the original integration for current Home Assistant versions, fixes some bugs, adds a UI config flow, direct API mode with endpoint fallback, automatic text chunking, and improves error handling.
+> This fork modernises the original integration for current Home Assistant versions, fixes several bugs, adds a UI config flow, over 3x more voices, direct API mode with endpoint fallback, automatic text chunking, support entities plus a custom dashboard card, improved error handling, and improved documentation.
 
 ---
 
 ## Installation
 
-### HACS (Recommended)
+<details><summary>
 
-1. Open **HACS** in your Home Assistant sidebar.
-2. Click the three-dot menu (top right) and choose **Custom repositories**.
-3. Paste `https://github.com/sfox38/tiktoktts` and select **Integration** as the category.
-4. Click **Add**, then find **tiktoktts** in the HACS Integration list and click **Download**.
-5. Restart Home Assistant.
+## Important: Click here if you are upgrading from the original Integration!
+</summary>
 
-### Manual Installation
-
-1. Download the latest release zip from this repository and unpack it.
-2. Copy the `tiktoktts` folder into your `config/custom_components/` directory. The result should be `config/custom_components/tiktoktts/`.
-3. Restart Home Assistant.
-
----
-
-## Upgrading from the Original Integration
-
-If you were using [philipp-luettecke/tiktoktts](https://github.com/philipp-luettecke/tiktoktts), this fork has **breaking changes** that require a clean removal before installing. You cannot simply overwrite the old files.
+  
+If you were using [philipp-luettecke/tiktoktts](https://github.com/philipp-luettecke/tiktoktts), this fork has **breaking changes** that require a clean removal before installing. You cannot simply overwrite the old files. You can [skip this section](#configuration) if you have not installed the previous integration.
 
 ### Breaking Changes
 
@@ -80,7 +69,23 @@ Go to **Settings -> System -> Restart** and do a full restart (not Quick Reload)
 Follow the [Installation](#installation) steps below. When you reach **Settings -> Devices & Services -> Add Integration**, you will go through the new UI setup wizard to reconfigure your endpoint and default voice.
 
 > [!NOTE]
-> Any automations that used `tts.tiktoktts` with a `platform: tiktoktts` style service call will need to be updated to use the `tts.speak` action format shown in the [Usage](#usage) section below.
+> Any automations that used the depricated `tts.tiktoktts_say` service call will need to be updated to use the `tts.speak` action format shown in the [Usage](#usage) section below.
+</details>
+
+
+### HACS (Recommended)
+
+1. Open **HACS** in your Home Assistant sidebar.
+2. Click the three-dot menu (top right) and choose **Custom repositories**.
+3. Paste `https://github.com/sfox38/tiktoktts` and select **Integration** as the category.
+4. Click **Add**, then find **tiktoktts** in the HACS Integration list and click **Download**.
+5. Restart Home Assistant.
+
+### Manual Installation
+
+1. Download the latest release zip from this repository and unpack it.
+2. Copy the `tiktoktts` folder into your `config/custom_components/` directory. The result should be `config/custom_components/tiktoktts/`.
+3. Restart Home Assistant.
 
 ---
 
@@ -99,14 +104,14 @@ For better reliability, you can self-host your own proxy instance and enter its 
 Calls TikTok's internal API directly using your TikTok session cookie.
 
 > [!IMPORTANT]
-> This uses an unofficial, reverse-engineered API and may violate TikTok's Terms of Service. Use at your own risk.
+> This uses TikTok's undocumented API and may violate TikTok's Terms of Service. Use at your own risk.
 
 Requires a `sessionid` cookie from a logged-in TikTok browser session:
-1. **Log in** to TikTok in your browser (you must have a TikTok account!)
+1. **Log in** to TikTok in your browser (you must have a TikTok account)
 2. Open Developer Tools (F12) -> Application -> Cookies
 3. Copy the value of the `sessionid` cookie
 
-The integration will automatically try multiple regional TikTok endpoints if the primary one fails.
+The integration will automatically try multiple regional TikTok endpoints if the primary one fails. You must input a valid `sessionid` cookie value or you will not be able to proceed.
 
 ---
 
@@ -122,6 +127,16 @@ Each configured instance creates its own entity with a fixed ID based on the con
 | Direct API | TikTokTTS Direct | `tts.tiktoktts_direct` |
 
 Both entities can coexist if you have configured both modes. Use the appropriate entity ID in your automations depending on which connection you want to use.
+
+The integration also creates these **shared** helper entities (one set regardless of how many instances you have configured). They are only used by the Home Assistant UI and dashboard cards, you generally won't need to manage them yourself:
+
+| Entity ID | Purpose |
+|---|---|
+| `select.tiktoktts_language` | Language selector dropdown |
+| `select.tiktoktts_voice` | Voice selector dropdown (filtered by language) |
+| `select.tiktoktts_device` | Output device selector (auto-populated from your media players) |
+| `text.tiktoktts_message` | Text input field for the message to speak |
+| `button.tiktoktts_speak` | Speak button - reads the above entities and calls tts.speak |
 
 ### tts.speak action
 
@@ -151,15 +166,16 @@ data:
     voice: en_us_007
 ```
 
-The `language` field filters available voices in the Automations editor UI, although it is recommended not to use this field at all. The `options.voice` field selects the specific voice. If you omit `options.voice`, the integration will use your configured default voice (if it matches the selected language) or the first available voice for the requested language.
+The `language` field filters available voices in the Automations editor UI, however it is recommended to leave this blank. The `options.voice` field selects the specific voice. If you omit `options.voice`, the integration will use your configured default voice (if it matches the selected language) or the first available voice for the requested language.
 
 > [!NOTE]
-> The voices currently supported by this integration represent the entire confirmed working set as of early 2026. TikTok's internal API supports many additional voices beyond this list, but their exact API IDs are not publicly documented, and some voices may be locale specific, so they cannot be reliably determined. If you discover a working voice ID that is not already in our list, please [submit a new Issue here](https://github.com/sfox38/tiktoktts/issues) and I can add it to the next release.
+> The voices currently supported by this integration represent the entire confirmed working set as of early 2026. TikTok's internal API supports additional voices beyond this list, but their exact API IDs are not publicly documented. Further, some voices may be locale specific, so you may not be able to use certain voices in your region, although in my own tests they all seem to work when using proxy mode. If you discover a working voice ID that is not already in our list, please [submit a new Issue here](https://github.com/sfox38/tiktoktts/issues) and I can add it to the next release.
 
 ### Voice Examples
 
-These samples were generated using TikTok TTS with a selection of English voices.  
-_Github doesn't support in-line audio, you will need to download these mp3 files first._
+These samples were generated using TikTok TTS with a selection of English voices.
+> [!NOTE]
+>Github doesn't support in-line audio, you will need to download these mp3 files first.
 
 | Sample | Voice ID |
 |---|---|
@@ -171,138 +187,282 @@ _Github doesn't support in-line audio, you will need to download these mp3 files
 | [▶ Listen](https://raw.githubusercontent.com/sfox38/tiktoktts/main/examples/joke6.mp3) | `en_female_emotional` | 
 
 
-### Supported Languages
+### Dashboard Cards
 
-| Code | Language |
-|---|---|
-| `en_us` | English (US) |
-| `en_uk` | English (UK) |
-| `en_au` | English (AU) |
-| `fr` | French |
-| `de` | German |
-| `es` | Spanish |
-| `es_mx` | Spanish (Mexico) |
-| `pt_br` | Portuguese (Brazil) |
-| `id` | Indonesian |
-| `ja` | Japanese |
-| `ko` | Korean |
+This integration creates a set of shared helper entities plus a custom dashboard card which all work together as a TTS control panel. You can use this card to easily preview voices, or to send impromptu messages to speakers around your home. The dashboard card will look like the one shown at the top of this page.
 
+You don't need to install this dashboard card separately, it is automatically installed along with this integration. To add this card to any dashboard - search for `TikTokTTS` when adding a new card using the wizard, or just create an empty dashboard card with the following text:
 
-### Supported Voices
+```yaml
+type: custom:tiktoktts-card
+```
 
-Voices are grouped by language. The **Voice ID** is the value to use in the
-`options.voice` field of the `tts.speak` action.
+Alternatively, you can create a standard dashboard card using only the TikTok TTS entities:
 
-#### 🇺🇸 English (US) `en_us`
+```yaml
+type: entities
+title: TikTok TTS
+entities:
+  - select.tiktoktts_language
+  - select.tiktoktts_voice
+  - text.tiktoktts_message
+  - select.tiktoktts_device
+  - button.tiktoktts_speak
+```
 
-| Voice ID | Description |
-|---|---|
-| `en_us_001` | Female (International 1) |
-| `en_us_002` | Female (International 2) |
-| `en_us_006` | Male 1 |
-| `en_us_007` | Male 2 |
-| `en_us_009` | Male 3 |
-| `en_us_010` | Male 4 |
+**How it works:**
 
-#### 🇬🇧 English (UK) `en_uk`
+1. Select a language from `select.tiktoktts_language` - the voice list filters automatically
+2. Select a voice from `select.tiktoktts_voice`
+3. Type your message in `text.tiktoktts_message`
+4. Select your output speaker from `select.tiktoktts_device` - auto-populated from all available media players in your HA instance, and updates automatically when new devices come online
+5. Press `button.tiktoktts_speak` - reads all four fields and calls `tts.speak` server-side
 
-| Voice ID | Description |
-|---|---|
-| `en_uk_001` | Male 1 |
-| `en_uk_003` | Male 2 |
+> [!NOTE]
+> All selections are remembered across HA restarts. The device list automatically refreshes when media players become available, including late-loading integrations like browser_mod.
 
-#### 🇦🇺 English (AU) `en_au`
+## Supported Languages & Voices
 
-| Voice ID | Description |
-|---|---|
-| `en_au_001` | Female |
-| `en_au_002` | Male |
+The **Voice ID** is the value to use in the `options.voice` field of the `tts.speak` action.
+Click any language group to expand its full voice list.
 
-#### 🇫🇷 French `fr`
+---
+
+<details>
+<summary>🇺🇸 English (US) &nbsp;-&nbsp; <code>en_us</code> &nbsp;(24 voices)</summary>
 
 | Voice ID | Description |
 |---|---|
-| `fr_001` | Male 1 |
-| `fr_002` | Male 2 |
+| `en_male_santa_narration` | Author |
+| `en_female_betty` | Bae |
+| `en_female_makeup` | Beauty Guru |
+| `en_female_richgirl` | Bestie |
+| `en_us_010` | Confidence |
+| `en_male_cupid` | Cupid |
+| `en_female_shenna` | Debutante |
+| `en_female_samc` | Empathetic |
+| `en_male_jomboy` | Game On |
+| `en_female_grandma` | Granny |
+| `en_us_001` | Jessie |
+| `en_us_006` | Joey |
+| `en_male_wizard` | Magician |
+| `en_male_trevor` | Marty |
+| `en_male_deadpool` | Mr. GoodGuy |
+| `en_us_007` | Professor |
+| `en_male_santa` | Santa |
+| `en_male_santa_effect` | Santa (with effect) |
+| `en_us_009` | Scientist |
+| `en_male_cody` | Serious |
+| `en_male_narration` | Story Teller |
+| `en_male_grinch` | Trickster |
+| `en_female_pansino` | Varsity |
+| `en_male_funny` | Wacky |
 
-#### 🇩🇪 German `de`
+</details>
 
-| Voice ID | Description |
-|---|---|
-| `de_001` | Female |
-| `de_002` | Male |
-
-#### 🇪🇸 Spanish `es`
-
-| Voice ID | Description |
-|---|---|
-| `es_002` | Male |
-
-#### 🇲🇽 Spanish (Mexico) `es_mx`
-
-| Voice ID | Description |
-|---|---|
-| `es_mx_002` | Male |
-
-#### 🇧🇷 Portuguese (Brazil) `pt_br`
-
-| Voice ID | Description |
-|---|---|
-| `br_001` | Female 1 |
-| `br_003` | Female 2 |
-| `br_004` | Female 3 |
-| `br_005` | Male |
-
-#### 🇮🇩 Indonesian `id`
+<details>
+<summary>🇬🇧 English (UK) &nbsp;-&nbsp; <code>en_uk</code> &nbsp;(8 voices)</summary>
 
 | Voice ID | Description |
 |---|---|
-| `id_001` | Female |
+| `en_male_jarvis` | Alfred |
+| `en_male_ashmagic` | Ash Magic |
+| `en_male_ukneighbor` | Lord Cringe |
+| `en_uk_003` | Male English UK |
+| `en_male_ukbutler` | Mr. Meticulous |
+| `en_uk_001` | Narrator |
+| `en_male_olantekkers` | Olan Tekkers |
+| `en_female_emotional` | Peaceful |
 
-#### 🇯🇵 Japanese `ja`
+</details>
 
-| Voice ID | Description |
-|---|---|
-| `jp_001` | Female 1 |
-| `jp_003` | Female 2 |
-| `jp_005` | Female 3 |
-| `jp_006` | Male |
-
-#### 🇰🇷 Korean `ko`
-
-| Voice ID | Description |
-|---|---|
-| `kr_002` | Male 1 |
-| `kr_003` | Female |
-| `kr_004` | Male 2 |
-
-#### 🎭 Character Voices `en_us`
-
-These are novelty voices included in the English (US) language group.
+<details>
+<summary>🇦🇺 English (AU) &nbsp;-&nbsp; <code>en_au</code> &nbsp;(2 voices)</summary>
 
 | Voice ID | Description |
 |---|---|
-| `en_us_ghostface` | Ghost Face (Scream) |
+| `en_au_001` | Metro |
+| `en_au_002` | Smooth |
+
+</details>
+
+<details>
+<summary>🎭 Disney / Character &nbsp;-&nbsp; <code>disney</code> &nbsp;(9 voices)</summary>
+
+| Voice ID | Description |
+|---|---|
+| `en_us_c3po` | C3PO |
 | `en_us_chewbacca` | Chewbacca |
-| `en_us_c3po` | C-3PO |
+| `en_male_ghosthost` | Ghost Host |
+| `en_female_madam_leota` | Madame Leota |
+| `en_male_pirate` | Pirate |
+| `en_us_rocket` | Rocket |
+| `en_us_ghostface` | Scream |
 | `en_us_stitch` | Stitch |
 | `en_us_stormtrooper` | Stormtrooper |
-| `en_us_rocket` | Rocket Raccoon |
 
-#### 🎵 Singing / Expressive Voices `en_us`
+</details>
 
-These voices work best with musical or expressive text.
-They are included in the English (US) language group.
+<details>
+<summary>🎵 Music / Singing &nbsp;-&nbsp; <code>music</code> &nbsp;(15 voices)</summary>
+
+These voices are optimised for musical or expressive text rather than natural speech.
 
 | Voice ID | Description |
 |---|---|
-| `en_female_f08_salut_damour` | Alto |
-| `en_male_m03_lobby` | Tenor |
-| `en_female_f08_warmy_breeze` | Warmy Breeze |
-| `en_male_m03_sunshine_soon` | Sunshine Soon |
-| `en_male_narration` | Narrator |
-| `en_male_funny` | Wacky |
-| `en_female_emotional` | Peaceful / Emotional |
+| `en_male_sing_deep_jingle` | Caroler |
+| `en_male_m03_classical` | Classic Electric |
+| `en_female_f08_salut_damour` | Cottagecore |
+| `en_male_m2_xhxs_m03_christmas` | Cozy |
+| `en_female_ht_f08_glorious` | Euphoric |
+| `en_male_sing_funny_it_goes_up` | Hypetrain |
+| `en_male_m03_lobby` | Jingle |
+| `en_female_ht_f08_wonderful_world` | Melodrama |
+| `en_female_ht_f08_newyear` | NYE 2023 |
+| `en_female_f08_warmy_breeze` | Open Mic |
+| `en_female_ht_f08_halloween` | Opera |
+| `en_female_f08_twinkle` | Pop Lullaby |
+| `en_male_m2_xhxs_m03_silly` | Quirky Time |
+| `en_male_sing_funny_thanksgiving` | Thanksgiving |
+| `en_male_m03_sunshine_soon` | Toon Beat |
+
+</details>
+
+<details>
+<summary>🇫🇷 French &nbsp;-&nbsp; <code>fr</code> &nbsp;(2 voices)</summary>
+
+| Voice ID | Description |
+|---|---|
+| `fr_001` | French - Male 1 |
+| `fr_002` | French - Male 2 |
+
+</details>
+
+<details>
+<summary>🇮🇹 Italian &nbsp;-&nbsp; <code>it</code> &nbsp;(1 voice)</summary>
+
+| Voice ID | Description |
+|---|---|
+| `it_male_m18` | Italian Male |
+
+</details>
+
+<details>
+<summary>🇪🇸 Spanish &nbsp;-&nbsp; <code>es</code> &nbsp;(4 voices)</summary>
+
+| Voice ID | Description |
+|---|---|
+| `es_female_f6` | Alejandra |
+| `es_male_m3` | Julio |
+| `es_female_fp1` | Mariana |
+| `es_002` | Spanish - Male |
+
+</details>
+
+<details>
+<summary>🇲🇽 Spanish (Mexico) &nbsp;-&nbsp; <code>es_mx</code> &nbsp;(2 voices)</summary>
+
+| Voice ID | Description |
+|---|---|
+| `es_mx_female_supermom` | Super Mamá |
+| `es_mx_002` | Álex |
+
+</details>
+
+<details>
+<summary>🇩🇪 German &nbsp;-&nbsp; <code>de</code> &nbsp;(2 voices)</summary>
+
+| Voice ID | Description |
+|---|---|
+| `de_001` | German - Female |
+| `de_002` | German - Male |
+
+</details>
+
+<details>
+<summary>🇧🇷 Portuguese (Brazil) &nbsp;-&nbsp; <code>pt_br</code> &nbsp;(5 voices)</summary>
+
+| Voice ID | Description |
+|---|---|
+| `br_004` | Ana |
+| `bp_female_ivete` | Ivete Sangalo |
+| `br_003` | Júlia |
+| `br_005` | Lucas |
+| `bp_female_ludmilla` | Ludmilla |
+
+</details>
+
+<details>
+<summary>🇵🇹 Portuguese (Portugal) &nbsp;-&nbsp; <code>pt_pt</code> &nbsp;(3 voices)</summary>
+
+| Voice ID | Description |
+|---|---|
+| `pt_male_bueno` | Galvão Bueno |
+| `pt_female_laizza` | Laizza |
+| `pt_female_lhays` | Lhays Macedo |
+
+</details>
+
+<details>
+<summary>🇮🇩 Indonesian &nbsp;-&nbsp; <code>id</code> &nbsp;(4 voices)</summary>
+
+| Voice ID | Description |
+|---|---|
+| `id_male_darma` | Darma |
+| `id_female_icha` | Icha |
+| `id_female_noor` | Noor |
+| `id_male_putra` | Putra |
+
+</details>
+
+<details>
+<summary>🇯🇵 Japanese &nbsp;-&nbsp; <code>ja</code> &nbsp;(20 voices)</summary>
+
+| Voice ID | Description |
+|---|---|
+| `jp_003` | Keiko (恵子) |
+| `jp_001` | Miho (美穂) |
+| `jp_male_keiichinakano` | Morio's Kitchen |
+| `jp_006` | Naoki (直樹) |
+| `jp_005` | Sakura (さくら) |
+| `jp_female_machikoriiita` | まちこりーた |
+| `jp_female_fujicochan` | りーさ |
+| `jp_male_hikakin` | ヒカキン |
+| `jp_male_matsudake` | マツダ家の日常 |
+| `jp_male_matsuo` | モジャオ |
+| `jp_male_osada` | モリスケ |
+| `jp_female_hasegawariona` | 世羅鈴 |
+| `jp_female_rei` | 丸山礼 |
+| `jp_male_yujinchigusa` | 低音ボイス |
+| `jp_male_shuichiro` | 修一朗 |
+| `jp_female_yagishaki` | 八木沙季 |
+| `jp_female_shirou` | 四郎 |
+| `jp_female_oomaeaika` | 夏絵ココ |
+| `jp_female_kaorishoji` | 庄司果織 |
+| `jp_male_tamawakazuki` | 玉川寿紀 |
+
+</details>
+
+<details>
+<summary>🇰🇷 Korean &nbsp;-&nbsp; <code>ko</code> &nbsp;(3 voices)</summary>
+
+| Voice ID | Description |
+|---|---|
+| `kr_003` | Korean - Female |
+| `kr_002` | Korean - Male 1 |
+| `kr_004` | Korean - Male 2 |
+
+</details>
+
+<details>
+<summary>🇻🇳 Vietnamese &nbsp;-&nbsp; <code>vi</code> &nbsp;(2 voices)</summary>
+
+| Voice ID | Description |
+|---|---|
+| `BV074_streaming` | Vietnamese - Female |
+| `BV075_streaming` | Vietnamese - Male |
+
+</details>
 
 ### Changing the Default Voice
 
@@ -319,7 +479,7 @@ The community Weilbyte proxy is a free, volunteer-run service and may occasional
 TikTok session IDs expire periodically. If you see errors about an invalid or expired session ID, go to the integration options and update the value from your browser cookies.
 
 ### Check the logs
-Go to **Settings -> System -> Logs** and filter for `tiktoktts` to see detailed error messages.
+Go to **Settings -> System -> Logs** and filter for `tiktoktts` to find detailed error messages.
 
 ---
 
