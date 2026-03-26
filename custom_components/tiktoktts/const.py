@@ -9,7 +9,7 @@ LOGGER: Logger = getLogger(__package__)
 
 NAME = "TikTok TTS"
 DOMAIN = "tiktoktts"
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 # ---------------------------------------------------------------------------
 # Attribution & credits
@@ -455,6 +455,19 @@ UNIQUE_ID_SPEAK       = f"{DOMAIN}_speak"
 HASS_DATA_SELECT_CREATED = "shared_select_created"
 HASS_DATA_TEXT_CREATED   = "shared_text_created"
 HASS_DATA_BUTTON_CREATED = "shared_button_created"
+
+# hass.data[DOMAIN] keys for random voice store
+HASS_DATA_RANDOM_STORE   = "random_voice_store"
+HASS_DATA_RANDOM_LANGS   = "random_voice_languages"
+HASS_DATA_LANGUAGE_ENTITY = "language_entity"
+
+# Random voice feature constants
+RANDOM_VOICE_CODE      = "random"
+RANDOM_VOICE_NAME      = "Random Voice"
+RANDOM_VOICE_LANG_NAME = "🎲 Random Voice"
+
+# Custom service for updating the random voice language set
+SERVICE_SET_RANDOM_VOICES = "set_random_voices"
 
 # Placeholder shown in device/voice dropdowns before data is loaded
 PLACEHOLDER_LOADING = "(loading...)"

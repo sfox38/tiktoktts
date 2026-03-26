@@ -4,6 +4,7 @@ This file defines TikTokTTSEntity, the single TTS entity created by this
 integration. It handles:
 
   - Voice selection and language-to-voice mapping
+  - Random voice resolution from a user-configured language pool
   - Routing requests to either the proxy API or the direct TikTok API
   - Text chunking for long messages (direct mode only)
   - Retry logic with configurable attempts and backoff delay
@@ -27,6 +28,15 @@ DIRECT mode - POST to {endpoint}/media/api/text/speech/invoke/ with query params
               If the configured endpoint fails, the code automatically retries
               against all other known regional TikTok API URLs.
 
+Random voice mode
+-----------------
+When voice=random is passed in options, async_get_tts_audio picks a voice at
+random from the language pool stored in hass.data[DOMAIN][HASS_DATA_RANDOM_LANGS].
+After generating audio, it sets _random_voice_active=True in hass.data[DOMAIN].
+This flag is read by _RandomVoiceAwareCache (in __init__.py) which forces a cache
+miss on the next call, ensuring a fresh random voice is picked every time. The
+self-perpetuating flag mechanism works for both dashboard and automation callers.
+
 Config is read dynamically on every call
 -----------------------------------------
 All four config properties (_api_mode, _endpoint, _voice, _session_id) are
@@ -36,7 +46,7 @@ reloads, the entity immediately uses the updated values - no further restart nee
 
 Credits
 -------
-Original integration: Philipp Lüttecke (https://github.com/philipp-luettecke/tiktoktts)
+Original integration: Philipp Luttecke (https://github.com/philipp-luettecke/tiktoktts)
 Community TTS proxy:  Weilbyte (https://github.com/Weilbyte/tiktok-tts)
 Voice list reference: oscie57 (https://github.com/oscie57/tiktok-voice)
 Fork author:          Steven Fox / sfox38 (https://github.com/sfox38/tiktoktts)
@@ -83,11 +93,13 @@ from .const import (
     DIRECT_API_STATUS_OK,
     DIRECT_API_USER_AGENT,
     DOMAIN,
+    HASS_DATA_RANDOM_LANGS,
     LOGGER,
     PROXY_API_FIELD_DATA,
     PROXY_API_FIELD_TEXT,
     PROXY_API_FIELD_VOICE,
     PROXY_API_PATH_GENERATE,
+    RANDOM_VOICE_CODE,
     REQUEST_MAX_RETRIES,
     REQUEST_RETRY_DELAY,
     REQUEST_TIMEOUT,
@@ -285,9 +297,10 @@ class TikTokTTSEntity(TextToSpeechEntity):
 
         Voice resolution order:
           1. Explicit voice in options dict (e.g. options={"voice": "en_us_007"})
-          2. Configured default voice, if it belongs to the requested language
-          3. First voice in VOICES_BY_LANGUAGE for the requested language
-          4. Global DEFAULT_VOICE constant as a last resort
+          2. "random" sentinel - resolved to a random pool voice (see below)
+          3. Configured default voice, if it belongs to the requested language
+          4. First voice in VOICES_BY_LANGUAGE for the requested language
+          5. Global DEFAULT_VOICE constant as a last resort
         """
         options = options or {}
 
@@ -295,23 +308,48 @@ class TikTokTTSEntity(TextToSpeechEntity):
         if not voice:
             lang_voices = VOICES_BY_LANGUAGE.get(language, [])
             if self._voice in lang_voices:
-                # Configured default is valid for this language - use it
                 voice = self._voice
             elif lang_voices:
-                # Default voice doesn't belong to this language - auto-select
-                # the first voice that does, and log so the user knows why
                 voice = lang_voices[0]
                 LOGGER.debug(
                     "Default voice '%s' is not in language '%s'; using '%s' instead",
                     self._voice, language, voice,
                 )
             else:
-                # Unrecognised language - fall back to the global default
                 voice = DEFAULT_VOICE
                 LOGGER.warning(
                     "No voices found for language '%s'; falling back to '%s'",
                     language, DEFAULT_VOICE,
                 )
+
+        if voice == RANDOM_VOICE_CODE:
+            import random
+            # Pick a random voice from the configured language pool.
+            # Falls back to DEFAULT_VOICE if the pool is empty or not configured.
+            langs = self.hass.data.get(DOMAIN, {}).get(HASS_DATA_RANDOM_LANGS, [])
+            if langs:
+                pool = [v for lang in langs for v in VOICES_BY_LANGUAGE.get(lang, [])]
+                if pool:
+                    voice = random.choice(pool)
+                    LOGGER.debug("Random voice selected: %s", voice)
+                else:
+                    voice = DEFAULT_VOICE
+                    LOGGER.warning("Random voice pool is empty after expansion; using default voice")
+            else:
+                voice = DEFAULT_VOICE
+                LOGGER.warning("Random voice language set is empty; using default voice")
+
+            result = await (
+                self._get_audio_direct(message, voice)
+                if self._api_mode == API_MODE_DIRECT
+                else self._get_audio_proxy(message, voice)
+            )
+            # Set the flag AFTER generating audio so the next tts.speak call
+            # (from any source) is also forced to be a cache miss, ensuring
+            # async_get_tts_audio is always called for voice=random.
+            # See _RandomVoiceAwareCache in __init__.py for the full mechanism.
+            self.hass.data[DOMAIN]["_random_voice_active"] = True
+            return result
 
         # If the voice is not in our known list, log a debug message but
         # still pass it through to TikTok's API. This allows users to test
