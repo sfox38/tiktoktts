@@ -15,7 +15,7 @@ A Home Assistant custom integration that provides Text-to-Speech using TikTok's 
 | **Fork author** | Steven Fox | [sfox38/tiktoktts](https://github.com/sfox38/tiktoktts) |
 
 > [!NOTE]
-> This fork modernises the original integration for current Home Assistant versions, fixes several bugs, adds a UI config flow, over 3x more voices, direct API mode with endpoint fallback, automatic text chunking, support entities plus a custom dashboard card, improved error handling, and improved documentation.
+> This fork modernises the original integration for current Home Assistant versions, fixes several bugs, adds a UI config flow, over 3x more voices, direct API mode with endpoint fallback, automatic text chunking, a Random Voice feature, support entities plus a custom dashboard card, improved error handling, and improved documentation. Current version: **v1.2.0**.
 
 ---
 
@@ -168,6 +168,28 @@ data:
 
 The `language` field filters available voices in the Automations editor UI, however it is recommended to leave this blank. The `options.voice` field selects the specific voice. If you omit `options.voice`, the integration will use your configured default voice (if it matches the selected language) or the first available voice for the requested language.
 
+### Random Voice
+
+You can configure a pool of language groups to draw from randomly on each `tts.speak` call. Press the 🎲 dice button next to the Speak button in the dashboard card to open the Random Voice settings panel. Tick the language groups you want included in the pool and press "Save and close". Once at least one language is selected, `🎲 Random Voice` appears as an option in the language dropdown with a single `Random Voice` voice option beneath it.
+
+A different voice is picked on every call -- the integration bypasses HA's in-memory TTS cache when random voice is active, so you always get a fresh voice regardless of message text or call source.
+
+To use random voice in an automation, pass `voice: random` in the options:
+
+```yaml
+action: tts.speak
+target:
+  entity_id: tts.tiktoktts_proxy
+data:
+  media_player_entity_id: media_player.your_speaker
+  message: "Hello!"
+  options:
+    voice: random
+```
+
+> [!NOTE]
+> The `cache` setting has no effect when `voice: random` is used. The integration always bypasses the cache for random voice calls to ensure a fresh voice is selected every time, regardless of whether you set `cache: true` or `cache: false`.
+
 > [!NOTE]
 > The voices currently supported by this integration represent the entire confirmed working set as of early 2026. TikTok's internal API supports additional voices beyond this list, but their exact API IDs are not publicly documented. Further, some voices may be locale specific, so you may not be able to use certain voices in your region, although in my own tests they all seem to work when using proxy mode. If you discover a working voice ID that is not already in our list, please [submit a new Issue here](https://github.com/sfox38/tiktoktts/issues) and I can add it to the next release.
 
@@ -212,11 +234,12 @@ entities:
 
 **How it works:**
 
-1. Select a language from `select.tiktoktts_language` - the voice list filters automatically
+1. Select a language from `select.tiktoktts_language` - the voice list filters automatically. Select `🎲 Random Voice` to use the random voice feature.
 2. Select a voice from `select.tiktoktts_voice`
-3. Type your message in `text.tiktoktts_message`
+3. Type your message in `text.tiktoktts_message` (maximum 255 characters)
 4. Select your output speaker from `select.tiktoktts_device` - auto-populated from all available media players in your HA instance, and updates automatically when new devices come online
-5. Press `button.tiktoktts_speak` - reads all four fields and calls `tts.speak` server-side
+5. Press the Speak button - reads all fields and calls `tts.speak` server-side
+6. Press the 🎲 dice button next to Speak to open the Random Voice settings panel, where you can select which language groups to include in the random voice pool
 
 > [!NOTE]
 > All selections are remembered across HA restarts. The device list automatically refreshes when media players become available, including late-loading integrations like browser_mod.
@@ -477,6 +500,12 @@ The community Weilbyte proxy is a free, volunteer-run service and may occasional
 
 ### Direct API: session_id expired
 TikTok session IDs expire periodically. If you see errors about an invalid or expired session ID, go to the integration options and update the value from your browser cookies.
+
+### Random Voice always plays the same voice
+If random voice stops picking different voices after a HA update, the integration's internal cache-bypass mechanism may have broken due to HA internals changing. Check the HA logs for `"TikTokTTS: random voice cache installed successfully"` at startup. If that line is missing, or if you see a warning about `SpeechManager`, please open an issue on GitHub.
+
+### Message too long error
+The message text entity has a maximum length of 255 characters, which is enforced by HA's text entity platform. The dashboard card enforces this limit in the textarea. If you are calling `tts.speak` from an automation with a longer message, TikTok's direct API will handle chunking automatically - only the HA entity has the 255 character restriction.
 
 ### Check the logs
 Go to **Settings -> System -> Logs** and filter for `tiktoktts` to find detailed error messages.
