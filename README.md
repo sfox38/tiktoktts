@@ -2,7 +2,7 @@
 
 A Home Assistant custom integration that provides Text-to-Speech using TikTok's voice engine, supporting a wide range of languages and expressive voices.
 
-<img src="https://github.com/sfox38/tiktoktts/blob/main/examples/dash-custom.jpg" width="50%" alttext="dashbaord">
+<img src="https://github.com/sfox38/tiktoktts/blob/main/examples/dash-custom-v1.2.jpg" width="50%" alttext="dashboard">
 
 
 ## Credits & Attribution
@@ -15,7 +15,7 @@ A Home Assistant custom integration that provides Text-to-Speech using TikTok's 
 | **Fork author** | Steven Fox | [sfox38/tiktoktts](https://github.com/sfox38/tiktoktts) |
 
 > [!NOTE]
-> This fork modernises the original integration for current Home Assistant versions, fixes several bugs, adds a UI config flow, over 3x more voices, direct API mode with endpoint fallback, automatic text chunking, a Random Voice feature, support entities plus a custom dashboard card, improved error handling, and improved documentation. Current version: **v1.2.0**.
+> This fork modernises the original integration for current Home Assistant versions, fixes several bugs, adds a UI config flow, over 3x more voices, direct API mode with endpoint fallback, automatic text chunking, a Random Voice feature, support entities plus a custom dashboard card, improved error handling, and improved documentation.
 
 ---
 
@@ -182,16 +182,13 @@ target:
   entity_id: tts.tiktoktts_proxy
 data:
   media_player_entity_id: media_player.your_speaker
-  message: "Hello!"
+  message: "Hello, this is TikTok TTS"
   options:
     voice: random
 ```
 
 > [!NOTE]
 > The `cache` setting has no effect when `voice: random` is used. The integration always bypasses the cache for random voice calls to ensure a fresh voice is selected every time, regardless of whether you set `cache: true` or `cache: false`.
-
-> [!NOTE]
-> The voices currently supported by this integration represent the entire confirmed working set as of early 2026. TikTok's internal API supports additional voices beyond this list, but their exact API IDs are not publicly documented. Further, some voices may be locale specific, so you may not be able to use certain voices in your region, although in my own tests they all seem to work when using proxy mode. If you discover a working voice ID that is not already in our list, please [submit a new Issue here](https://github.com/sfox38/tiktoktts/issues) and I can add it to the next release.
 
 ### Voice Examples
 
@@ -248,8 +245,6 @@ entities:
 
 The **Voice ID** is the value to use in the `options.voice` field of the `tts.speak` action.
 Click any language group to expand its full voice list.
-
----
 
 <details>
 <summary>🇺🇸 English (US) &nbsp;-&nbsp; <code>en_us</code> &nbsp;(24 voices)</summary>
@@ -487,6 +482,10 @@ These voices are optimised for musical or expressive text rather than natural sp
 
 </details>
 
+
+> [!NOTE]
+> The voices currently supported by this integration represent the entire confirmed working set as of early 2026. TikTok's internal API supports additional voices beyond this list, but their exact API IDs are not publicly documented. Further, some voices may be locale specific, so you may not be able to use certain voices in your region, although in my own tests they all seem to work when using proxy mode. If you discover a working voice ID that is not already in our list, please [submit a new Issue here](https://github.com/sfox38/tiktoktts/issues) and I can add it to the next release.
+
 ### Changing the Default Voice
 
 Go to **Settings -> Devices & Services -> TikTok TTS -> Configure** (gear icon). Changes take effect immediately after saving, no restart required.
@@ -500,9 +499,6 @@ The community Weilbyte proxy is a free, volunteer-run service and may occasional
 
 ### Direct API: session_id expired
 TikTok session IDs expire periodically. If you see errors about an invalid or expired session ID, go to the integration options and update the value from your browser cookies.
-
-### Random Voice always plays the same voice
-If random voice stops picking different voices after a HA update, the integration's internal cache-bypass mechanism may have broken due to HA internals changing. Check the HA logs for `"TikTokTTS: random voice cache installed successfully"` at startup. If that line is missing, or if you see a warning about `SpeechManager`, please open an issue on GitHub.
 
 ### Message too long error
 The message text entity has a maximum length of 255 characters, which is enforced by HA's text entity platform. The dashboard card enforces this limit in the textarea. If you are calling `tts.speak` from an automation with a longer message, TikTok's direct API will handle chunking automatically - only the HA entity has the 255 character restriction.
