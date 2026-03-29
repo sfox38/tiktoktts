@@ -66,7 +66,7 @@ class MessageTextEntity(TextEntity, RestoreEntity):
     _attr_icon = "mdi:message-text"
     _attr_mode = TextMode.TEXT
     _attr_native_min = 0
-    _attr_native_max = 500
+    _attr_native_max = 255
     _attr_unique_id = UNIQUE_ID_MESSAGE
     _attr_name = ENTITY_NAME_MESSAGE
 

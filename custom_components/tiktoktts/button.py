@@ -23,9 +23,28 @@ no YAML gymnastics required. The dashboard card becomes simply:
     - select.tiktoktts_device
     - button.tiktoktts_speak
 
-The button automatically picks the correct TTS entity (proxy or direct)
-based on whichever config entries are loaded. If both proxy and direct are
-configured, it tries proxy first then falls back to direct.
+TTS entity selection
+--------------------
+The button picks the correct TTS entity (proxy or direct) by inspecting
+loaded config entries via ConfigEntryState.LOADED rather than checking
+hass.states. This avoids a bug where stale state machine entries from a
+previously removed config entry would cause the button to target a TTS
+entity that no longer exists. Proxy mode is preferred over direct mode
+when both are configured.
+
+Random voice support
+--------------------
+When the selected voice code is RANDOM_VOICE_CODE ("random"), the button:
+  1. Sets cache=False so HA does not serve stale audio from the file cache.
+  2. Sets hass.data[DOMAIN]["_random_voice_active"] = True before calling
+     tts.speak. This flag is read by _RandomVoiceAwareCache (in __init__.py)
+     which intercepts HA's in-memory TTS cache lookup and returns a miss,
+     forcing async_get_tts_audio in tts.py to be called on every press
+     regardless of message text. Without this, HA would return the first
+     cached audio forever.
+  The flag is cleared inside async_get_tts_audio after the random voice is
+  resolved, then immediately set back to True, creating a self-perpetuating
+  mechanism so subsequent automation tts.speak calls also get fresh voices.
 """
 from __future__ import annotations
 
@@ -50,6 +69,7 @@ from .const import (
     LOGGER,
     PLACEHOLDER_LOADING,
     PLACEHOLDER_NO_DEVICES,
+    RANDOM_VOICE_CODE,
     TTS_SERVICE_DOMAIN,
     TTS_SERVICE_FIELD_CACHE,
     TTS_SERVICE_FIELD_MESSAGE,
@@ -102,13 +122,17 @@ class SpeakButtonEntity(ButtonEntity):
         """Handle button press - read helper entities and call tts.speak.
 
         Reads current values from:
-          text.tiktoktts_message  -> state value   (the message text)
-          select.tiktoktts_voice  -> 'code' attr   (the raw API voice code)
-          select.tiktoktts_device -> 'code' attr   (the raw media_player entity_id)
+          text.tiktoktts_message  -> state value  (the message text)
+          select.tiktoktts_voice  -> 'code' attr  (the raw API voice code)
+          select.tiktoktts_device -> 'code' attr  (the raw media_player entity_id)
 
         Voice and device use the 'code' attribute rather than state because
         their dropdowns display friendly names while storing API values in
         the attribute.
+
+        When random voice is selected, caching is disabled and the
+        _random_voice_active flag is set before calling tts.speak so the
+        _RandomVoiceAwareCache subclass forces a cache miss on this call.
         """
         # Strip whitespace - the card sends a single space when the textarea
         # is empty (HA text entity rejects truly empty strings), so we must
@@ -144,9 +168,16 @@ class SpeakButtonEntity(ButtonEntity):
             )
             return
 
+        # Disable caching for random voice so HA does not serve stale audio.
+        # Also set the _random_voice_active flag so _RandomVoiceAwareCache
+        # forces a mem_cache miss, ensuring async_get_tts_audio is called.
+        use_cache = voice != RANDOM_VOICE_CODE
+        if voice == RANDOM_VOICE_CODE and DOMAIN in self.hass.data:
+            self.hass.data[DOMAIN]["_random_voice_active"] = True
+
         LOGGER.debug(
-            "Speak button: entity=%s device=%s voice=%s message=%s",
-            tts_entity, device, voice,
+            "Speak button: entity=%s device=%s voice=%s cache=%s message=%s",
+            tts_entity, device, voice, use_cache,
             message[:50] + "..." if len(message) > 50 else message,
         )
 
@@ -156,7 +187,7 @@ class SpeakButtonEntity(ButtonEntity):
             service_data={
                 TTS_SERVICE_FIELD_PLAYER:  device,
                 TTS_SERVICE_FIELD_MESSAGE: message,
-                TTS_SERVICE_FIELD_CACHE:   True,
+                TTS_SERVICE_FIELD_CACHE:   use_cache,
                 TTS_SERVICE_FIELD_OPTIONS: {TTS_SERVICE_FIELD_VOICE: voice},
             },
             target={"entity_id": tts_entity},
@@ -192,19 +223,22 @@ class SpeakButtonEntity(ButtonEntity):
     def _pick_tts_entity(self) -> str | None:
         """Pick the TTS entity to use - proxy preferred over direct.
 
-        Checks which config entries are loaded and returns the entity_id
-        of the preferred available TTS entity.
+        Checks loaded config entries only via ConfigEntryState.LOADED.
+        Does not rely on hass.states which may contain stale entries from
+        previously removed config entries, causing the button to target a
+        TTS entity that no longer exists.
         """
+        from homeassistant.config_entries import ConfigEntryState
+
         entries = self.hass.config_entries.async_entries(DOMAIN)
+        loaded = [e for e in entries if e.state == ConfigEntryState.LOADED]
 
-        for entry in entries:
+        for entry in loaded:
             if entry.data.get(CONF_API_MODE, API_MODE_PROXY) == API_MODE_PROXY:
-                if self.hass.states.get(ENTITY_ID_TTS_PROXY):
-                    return ENTITY_ID_TTS_PROXY
+                return ENTITY_ID_TTS_PROXY
 
-        for entry in entries:
+        for entry in loaded:
             if entry.data.get(CONF_API_MODE) == API_MODE_DIRECT:
-                if self.hass.states.get(ENTITY_ID_TTS_DIRECT):
-                    return ENTITY_ID_TTS_DIRECT
+                return ENTITY_ID_TTS_DIRECT
 
         return None

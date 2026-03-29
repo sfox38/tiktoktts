@@ -19,6 +19,29 @@ Selecting a language automatically rebuilds the voice dropdown to show only
 voices for that language group. The voice state is a friendly label; the raw
 API code is exposed via the 'code' state attribute for automation use.
 
+Random Voice support
+--------------------
+When the user configures a random voice pool (via the dashboard card's dice
+button), a "Random Voice" language option appears at the top of the language
+dropdown. Selecting it sets the voice dropdown to a single "Random Voice"
+option. The actual voice is resolved at speak time by tts.py.
+
+The language entity stores the random voice pool in hass.data[DOMAIN] and
+exposes it via the 'random_voice_languages' state attribute so the dashboard
+card can read the current pool to pre-check the language checkboxes.
+
+The language entity is stored in hass.data[DOMAIN][HASS_DATA_LANGUAGE_ENTITY]
+so the set_random_voices service handler in __init__.py can call
+async_refresh_random_voice_option() directly without going through the
+unreliable entity_components lookup.
+
+Restore-on-restart
+------------------
+All three entities use RestoreEntity to persist selections across HA restarts.
+The language entity defers voice entity notification via async_create_task with
+a retry loop to avoid a RuntimeError when the voice entity hasn't been added
+to hass yet at the time the language entity's async_added_to_hass runs.
+
 Device select
 -------------
 Populated dynamically from hass.states at startup. Shows HA friendly names
@@ -46,12 +69,17 @@ from .const import (
     ENTITY_NAME_DEVICE,
     ENTITY_NAME_LANGUAGE,
     ENTITY_NAME_VOICE,
+    HASS_DATA_LANGUAGE_ENTITY,
+    HASS_DATA_RANDOM_LANGS,
     HASS_DATA_SELECT_CREATED,
     LANGUAGE_ALL_CODE,
     LANGUAGE_ALL_NAME,
     LANGUAGE_NAMES,
     LOGGER,
     PLACEHOLDER_LOADING,
+    RANDOM_VOICE_CODE,
+    RANDOM_VOICE_LANG_NAME,
+    RANDOM_VOICE_NAME,
     SUPPORTED_LANGUAGES,
     UNIQUE_ID_DEVICE,
     UNIQUE_ID_LANGUAGE,
@@ -65,6 +93,8 @@ def _lang_to_name(code: str) -> str:
     """Convert a language code to its friendly display name."""
     if code == LANGUAGE_ALL_CODE:
         return LANGUAGE_ALL_NAME
+    if code == RANDOM_VOICE_CODE:
+        return RANDOM_VOICE_LANG_NAME
     return LANGUAGE_NAMES.get(code, code)
 
 
@@ -72,6 +102,8 @@ def _name_to_lang(name: str) -> str:
     """Convert a friendly language name back to its API code."""
     if name == LANGUAGE_ALL_NAME:
         return LANGUAGE_ALL_CODE
+    if name == RANDOM_VOICE_LANG_NAME:
+        return RANDOM_VOICE_CODE
     for code, friendly in LANGUAGE_NAMES.items():
         if friendly == name:
             return code
@@ -131,6 +163,8 @@ async def async_setup_entry(
     voice_entity = VoiceSelectEntity(language_entity, default_voice)
     device_entity = DeviceSelectEntity()
 
+    hass.data[DOMAIN][HASS_DATA_LANGUAGE_ENTITY] = language_entity
+
     async_add_entities([language_entity, voice_entity, device_entity])
     LOGGER.debug("Shared select entities created for entry %s", config_entry.entry_id)
 
@@ -151,7 +185,6 @@ class LanguageSelectEntity(SelectEntity, RestoreEntity):
     def __init__(self, default_voice: str) -> None:
         """Initialise with language derived from the configured default voice."""
         self.entity_id = ENTITY_ID_LANGUAGE
-        # Prepend "All Languages" so users can browse every voice at once
         self._attr_options = [LANGUAGE_ALL_NAME] + [_lang_to_name(c) for c in SUPPORTED_LANGUAGES]
 
         initial_lang = DEFAULT_LANG
@@ -168,15 +201,66 @@ class LanguageSelectEntity(SelectEntity, RestoreEntity):
         self._voice_entity = voice_entity
 
     async def async_added_to_hass(self) -> None:
-        """Restore the last selected language from the HA state database."""
+        """Restore the last selected language and apply random voice option if set.
+
+        Runs async_refresh_random_voice_option first (with write_state=False) so
+        the options list includes "Random Voice" before the restore check runs -
+        otherwise the restored state would fail the "in options" validation.
+
+        If the restored language is RANDOM_VOICE_CODE, notifies the voice entity
+        via a deferred async_create_task with a retry loop. Direct notification
+        is not possible here because the voice entity may not have been added
+        to hass yet (async_added_to_hass runs during platform setup, and both
+        entities are registered in the same async_add_entities call).
+        """
         await super().async_added_to_hass()
+        await self.async_refresh_random_voice_option(write_state=False)
         last_state = await self.async_get_last_state()
         if last_state and last_state.state in self._attr_options:
             code = _name_to_lang(last_state.state)
-            if code == LANGUAGE_ALL_CODE or code in SUPPORTED_LANGUAGES:
+            if code in (LANGUAGE_ALL_CODE, RANDOM_VOICE_CODE) or code in SUPPORTED_LANGUAGES:
                 self._current_code = code
                 self._attr_current_option = last_state.state
                 LOGGER.debug("Language restored to: %s", last_state.state)
+
+        if self._current_code == RANDOM_VOICE_CODE and self._voice_entity is not None:
+            async def _notify_voice_entity() -> None:
+                # Retry until the voice entity has been added to hass.
+                # Necessary because both entities are registered together and
+                # async_added_to_hass order is not guaranteed.
+                for _ in range(10):
+                    if self._voice_entity.hass is not None:
+                        await self._voice_entity.async_on_language_changed(RANDOM_VOICE_CODE)
+                        return
+                    await asyncio.sleep(0.5)
+                LOGGER.debug("Voice entity never became ready - skipping random voice notify on restore")
+            self.hass.async_create_task(_notify_voice_entity())
+
+    async def async_refresh_random_voice_option(self, write_state: bool = True) -> None:
+        """Add or remove the Random Voice option based on current store contents.
+
+        Called on startup (from async_added_to_hass) and whenever the random
+        voice language pool is updated by the set_random_voices service handler.
+        If write_state=False, skips async_write_ha_state - used during startup
+        to avoid writing state before the entity is fully registered.
+        If the pool becomes empty and random voice was selected, falls back to
+        the default language so the entity is never left in an invalid state.
+        """
+        langs = self.hass.data.get(DOMAIN, {}).get(HASS_DATA_RANDOM_LANGS, [])
+        base_options = [LANGUAGE_ALL_NAME] + [_lang_to_name(c) for c in SUPPORTED_LANGUAGES]
+        if langs:
+            if RANDOM_VOICE_LANG_NAME not in base_options:
+                base_options = [RANDOM_VOICE_LANG_NAME] + base_options
+        self._attr_options = base_options
+
+        if self._current_code == RANDOM_VOICE_CODE and not langs:
+            self._current_code = DEFAULT_LANG
+            self._attr_current_option = _lang_to_name(DEFAULT_LANG)
+
+        if write_state:
+            self.async_write_ha_state()
+            if self._voice_entity is not None:
+                await self._voice_entity.async_on_language_changed(self._current_code)
 
     @property
     def language_code(self) -> str:
@@ -185,13 +269,19 @@ class LanguageSelectEntity(SelectEntity, RestoreEntity):
 
     @property
     def extra_state_attributes(self) -> dict:
-        """Expose the raw language code as a state attribute."""
-        return {"code": self._current_code}
+        """Expose the raw language code and random voice languages as state attributes."""
+        langs = []
+        if self.hass:
+            langs = self.hass.data.get(DOMAIN, {}).get(HASS_DATA_RANDOM_LANGS, [])
+        return {
+            "code": self._current_code,
+            "random_voice_languages": langs,
+        }
 
     async def async_select_option(self, option: str) -> None:
         """Handle language selection and trigger voice list rebuild."""
         code = _name_to_lang(option)
-        if code != LANGUAGE_ALL_CODE and code not in SUPPORTED_LANGUAGES:
+        if code not in (LANGUAGE_ALL_CODE, RANDOM_VOICE_CODE) and code not in SUPPORTED_LANGUAGES:
             LOGGER.warning("Unknown language selected: %s", option)
             return
         self._current_code = code
@@ -226,6 +316,14 @@ class VoiceSelectEntity(SelectEntity, RestoreEntity):
         language_entity.set_voice_entity(self)
 
         initial_lang = language_entity.language_code
+
+        if initial_lang == RANDOM_VOICE_CODE:
+            self._current_codes       = [RANDOM_VOICE_CODE]
+            self._attr_options        = [RANDOM_VOICE_NAME]
+            self._current_code        = RANDOM_VOICE_CODE
+            self._attr_current_option = RANDOM_VOICE_NAME
+            return
+
         voice_codes = (
             [v for codes in VOICES_BY_LANGUAGE.values() for v in codes]
             if initial_lang == LANGUAGE_ALL_CODE
@@ -245,7 +343,15 @@ class VoiceSelectEntity(SelectEntity, RestoreEntity):
         """Restore the last selected voice from the HA state database."""
         await super().async_added_to_hass()
         last_state = await self.async_get_last_state()
-        if last_state and last_state.state in (self._attr_options or []):
+        if not last_state:
+            return
+        if last_state.state == RANDOM_VOICE_NAME:
+            self._current_codes       = [RANDOM_VOICE_CODE]
+            self._attr_options        = [RANDOM_VOICE_NAME]
+            self._current_code        = RANDOM_VOICE_CODE
+            self._attr_current_option = RANDOM_VOICE_NAME
+            LOGGER.debug("Voice restored to: %s", RANDOM_VOICE_NAME)
+        elif last_state.state in (self._attr_options or []):
             idx = self._attr_options.index(last_state.state)
             self._current_code = self._current_codes[idx]
             self._attr_current_option = last_state.state
@@ -273,6 +379,15 @@ class VoiceSelectEntity(SelectEntity, RestoreEntity):
         Called by LanguageSelectEntity. Resets to the first voice in the
         new language group.
         """
+        if new_language_code == RANDOM_VOICE_CODE:
+            self._current_codes  = [RANDOM_VOICE_CODE]
+            self._attr_options   = [RANDOM_VOICE_NAME]
+            self._current_code   = RANDOM_VOICE_CODE
+            self._attr_current_option = RANDOM_VOICE_NAME
+            self.async_write_ha_state()
+            LOGGER.debug("Voice options set to Random Voice")
+            return
+
         raw_codes = (
             [v for codes in VOICES_BY_LANGUAGE.values() for v in codes]
             if new_language_code == LANGUAGE_ALL_CODE
@@ -411,10 +526,6 @@ class DeviceSelectEntity(SelectEntity, RestoreEntity):
             # (e.g. browser_mod hasn't registered yet). Keep the restored
             # value and do NOT overwrite with the first device - the
             # state_changed listener will call us again when it appears.
-            LOGGER.debug(
-                "TikTokTTS: restored device '%s' not yet available - waiting",
-                self._current_device_id,
-            )
             return
 
         self.async_write_ha_state()

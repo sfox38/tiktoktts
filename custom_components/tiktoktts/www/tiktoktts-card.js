@@ -42,10 +42,10 @@ class TikTokTTSCard extends HTMLElement {
     super();
     this.attachShadow({ mode: "open" });
     this._hass            = null;
-    this._isFocused       = false;  // true while the message textarea has focus
-    this._voiceIdSelected = false;  // true while the API ID span text is selected
+    this._isFocused       = false;
+    this._voiceIdSelected = false;
+    this._settingsOpen    = false;
 
-    // Fixed entity IDs for all TikTokTTS helper entities
     this._entities = {
       language: "select.tiktoktts_language",
       voice:    "select.tiktoktts_voice",
@@ -279,7 +279,13 @@ class TikTokTTSCard extends HTMLElement {
         .char-count.warning { color: #ff9f0a; }
         .char-count.danger  { color: #ff453a; }
 
-        /* Speak button - accent background, white text, full width */
+        /* Speak + gear button row */
+        .action-row {
+          display: flex;
+          gap: 10px;
+          margin-top: 2px;
+        }
+
         .speak-btn {
           display: flex;
           align-items: center;
@@ -294,10 +300,9 @@ class TikTokTTSCard extends HTMLElement {
           font-weight: 600;
           font-family: inherit;
           cursor: pointer;
-          width: 100%;
+          flex: 1;
           letter-spacing: -0.2px;
           transition: filter 0.15s, transform 0.1s, opacity 0.15s;
-          margin-top: 2px;
         }
 
         .speak-btn:hover    { filter: brightness(1.2); }
@@ -310,16 +315,97 @@ class TikTokTTSCard extends HTMLElement {
           flex-shrink: 0;
         }
 
-        /* Status line below the button */
-        .status {
-          font-size: 11px;
+        .gear-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: var(--tts-field-bg);
+          border: 1px solid var(--tts-border);
+          border-radius: var(--tts-radius-sm);
           color: var(--tts-text-dim);
-          text-align: center;
-          min-height: 14px;
-          transition: color 0.2s;
+          cursor: pointer;
+          padding: 0 14px;
+          font-size: 20px;
+          transition: border-color 0.15s, opacity 0.15s;
+          flex-shrink: 0;
         }
-        .status.ok    { color: var(--tts-accent); }
-        .status.error { color: #ff453a; }
+
+        .gear-btn:hover  { border-color: var(--tts-focus); opacity: 0.8; }
+        .gear-btn.active { border-color: var(--tts-accent); }
+
+        /* Settings panel */
+        .settings-panel {
+          display: none;
+          flex-direction: column;
+          gap: 12px;
+          background: var(--tts-bg);
+          border: 1px solid var(--tts-border);
+          border-radius: var(--tts-radius-sm);
+          padding: 14px;
+        }
+
+        .settings-panel.open { display: flex; }
+
+        .settings-title {
+          font-size: 12px;
+          font-weight: 600;
+          color: var(--tts-text-dim);
+          text-transform: uppercase;
+          letter-spacing: 0.6px;
+        }
+
+        .settings-desc {
+          font-size: 12px;
+          color: var(--tts-text-dim);
+          line-height: 1.5;
+          margin-top: -4px;
+        }
+
+        .lang-checkbox-list {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          max-height: 220px;
+          overflow-y: auto;
+        }
+
+        .lang-checkbox-item {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          cursor: pointer;
+          padding: 4px 2px;
+        }
+
+        .lang-checkbox-item input[type="checkbox"] {
+          width: 16px;
+          height: 16px;
+          cursor: pointer;
+          accent-color: var(--tts-accent);
+          flex-shrink: 0;
+        }
+
+        .lang-checkbox-item span {
+          font-size: 14px;
+          color: var(--tts-text);
+        }
+
+        .settings-save-btn {
+          background: var(--tts-accent);
+          color: #fff;
+          border: none;
+          border-radius: var(--tts-radius-sm);
+          padding: 10px 16px;
+          font-size: 14px;
+          font-weight: 600;
+          font-family: inherit;
+          cursor: pointer;
+          transition: filter 0.15s;
+          align-self: flex-end;
+        }
+
+        .settings-save-btn:hover { filter: brightness(1.2); }
+
       </style>
 
       <ha-card>
@@ -334,8 +420,8 @@ class TikTokTTSCard extends HTMLElement {
         <div class="field">
           <div class="field-label">Language</div>
           <div class="field-row">
-            <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M3 5h12M9 3v2m-3.5 9.5A7.5 7.5 0 0 0 12 19m0 0a7.5 7.5 0 0 0 7.5-7.5M12 19v2m0-9.5a3.5 3.5 0 0 1 0 7"/>
+            <svg class="field-icon" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+              <path d="M12.87 15.07l-2.54-2.51.03-.03A17.52 17.52 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/>
             </svg>
             <select id="sel-language"></select>
           </div>
@@ -374,22 +460,29 @@ class TikTokTTSCard extends HTMLElement {
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
             </svg>
             <div class="message-input-wrap">
-              <textarea id="inp-message" placeholder="Type your message…" maxlength="500" rows="3"></textarea>
-              <div class="char-count" id="char-count">0 / 500</div>
+              <textarea id="inp-message" placeholder="Type your message…" maxlength="255" rows="3"></textarea>
+              <div class="char-count" id="char-count">0 / 255</div>
             </div>
           </div>
         </div>
 
-        <button class="speak-btn" id="btn-speak">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3M8 22h8"/>
-          </svg>
-          Speak...
-        </button>
+        <div class="action-row">
+          <button class="speak-btn" id="btn-speak">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3M8 22h8"/>
+            </svg>
+            Speak...
+          </button>
+          <button class="gear-btn" id="btn-gear" title="Random Voice Settings">🎲</button>
+        </div>
 
-        <!-- Status feedback line: shows "✓ Done" or "✗ Error" briefly after pressing Speak -->
-        <div class="status" id="status"></div>
+        <div class="settings-panel" id="settings-panel">
+          <div class="settings-title">Random Voice</div>
+          <div class="settings-desc">Select language groups to include in the random voice pool. At least one must be selected for Random Voice to appear in the language dropdown.</div>
+          <div class="lang-checkbox-list" id="lang-checkbox-list"></div>
+          <button class="settings-save-btn" id="btn-settings-save">Save and close</button>
+        </div>
       </ha-card>
     `;
 
@@ -434,7 +527,8 @@ class TikTokTTSCard extends HTMLElement {
       this._updateCharCount(val.length);
       clearTimeout(_debounce);
       _debounce = setTimeout(() => {
-        this._callTextService(this._entities.message, val || " ");
+        const truncated = val.slice(0, 255) || " ";
+        this._callTextService(this._entities.message, truncated);
       }, 600);
     });
 
@@ -463,6 +557,14 @@ class TikTokTTSCard extends HTMLElement {
 
     root.getElementById("btn-speak").addEventListener("click", () => {
       this._speak();
+    });
+
+    root.getElementById("btn-gear").addEventListener("click", () => {
+      this._toggleSettings();
+    });
+
+    root.getElementById("btn-settings-save").addEventListener("click", () => {
+      this._saveSettings();
     });
   }
 
@@ -499,12 +601,13 @@ class TikTokTTSCard extends HTMLElement {
         // Force a full DOM rebuild when "All Languages" is selected because
         // the options list changes significantly and the equality check could
         // produce a false positive, leaving the wrong voices displayed.
-        const isAllLangs = langState && langState.state === "🌐 All Languages";
+        const isAllLangs   = langState && langState.state === "🌐 All Languages";
+        const isRandomVoice = langState && langState.state === "🎲 Random Voice";
         this._populateSelect(
           root.getElementById("sel-voice"),
           options,
           voiceState.state,
-          isAllLangs  // forceRebuild
+          isAllLangs || isRandomVoice
         );
 
         // Update the API ID display - reads from the 'code' state attribute
@@ -581,9 +684,9 @@ class TikTokTTSCard extends HTMLElement {
    *  Colour changes: neutral -> orange at 350 -> red at 450. */
   _updateCharCount(len) {
     const el = this.shadowRoot.getElementById("char-count");
-    el.textContent = `${len} / 500`;
+    el.textContent = `${len} / 255`;
     el.className   = "char-count" +
-      (len > 450 ? " danger" : len > 350 ? " warning" : "");
+      (len > 230 ? " danger" : len > 200 ? " warning" : "");
   }
 
   /** Call select.select_option to persist a dropdown change to HA. */
@@ -602,39 +705,85 @@ class TikTokTTSCard extends HTMLElement {
     });
   }
 
-  /** Handle Speak button press.
-   *  Validates the message, disables the button, calls button.press on
-   *  button.tiktoktts_speak, then shows feedback and re-enables the button. */
-  async _speak() {
-    const btn    = this.shadowRoot.getElementById("btn-speak");
-    const status = this.shadowRoot.getElementById("status");
-    const msg    = this.shadowRoot.getElementById("inp-message").value.trim();
-
-    if (!msg) {
-      status.textContent = "⚠️ Please type a message first.";
-      status.className   = "status error";
-      setTimeout(() => { status.textContent = ""; status.className = "status"; }, 3000);
-      return;
+  /** Toggle the random voice settings panel open/closed. */
+  _toggleSettings() {
+    this._settingsOpen = !this._settingsOpen;
+    const panel   = this.shadowRoot.getElementById("settings-panel");
+    const gearBtn = this.shadowRoot.getElementById("btn-gear");
+    if (this._settingsOpen) {
+      this._buildCheckboxList();
+      panel.classList.add("open");
+      gearBtn.classList.add("active");
+    } else {
+      panel.classList.remove("open");
+      gearBtn.classList.remove("active");
     }
+  }
 
-    btn.disabled       = true;
-    btn.textContent    = "Speaking…";
-    status.textContent = "";
-    status.className   = "status";
+  /** Build the language checkbox list from LANGUAGE_NAMES data exposed via state attribute. */
+  _buildCheckboxList() {
+    const langState  = this._hass && this._hass.states[this._entities.language];
+    const savedLangs = langState
+      ? (langState.attributes.random_voice_languages || [])
+      : [];
+
+    const LANGUAGE_NAMES = {
+      "en_us":  "English (US)",
+      "en_uk":  "English (UK)",
+      "en_au":  "English (AU)",
+      "disney": "Disney / Character",
+      "music":  "Music / Singing",
+      "fr":     "French",
+      "it":     "Italian",
+      "es":     "Spanish",
+      "es_mx":  "Spanish (Mexico)",
+      "de":     "German",
+      "pt_br":  "Portuguese (Brazil)",
+      "pt_pt":  "Portuguese (Portugal)",
+      "id":     "Indonesian",
+      "ja":     "Japanese",
+      "ko":     "Korean",
+      "vi":     "Vietnamese",
+    };
+
+    const container = this.shadowRoot.getElementById("lang-checkbox-list");
+    container.innerHTML = Object.entries(LANGUAGE_NAMES).map(([code, name]) => {
+      const checked = savedLangs.includes(code) ? "checked" : "";
+      return `
+        <label class="lang-checkbox-item">
+          <input type="checkbox" value="${code}" ${checked}/>
+          <span>${this._esc(name)}</span>
+        </label>`;
+    }).join("");
+  }
+
+  /** Save checkbox selections and call tiktoktts.set_random_voices. */
+  async _saveSettings() {
+    const container = this.shadowRoot.getElementById("lang-checkbox-list");
+    const checked   = Array.from(container.querySelectorAll("input[type=checkbox]:checked"))
+      .map(el => el.value);
 
     try {
-      // button.tiktoktts_speak reads all entity states server-side and calls
-      // tts.speak - no templates needed in the card
-      await this._hass.callService("button", "press", {
-        entity_id: this._entities.speak,
+      await this._hass.callService("tiktoktts", "set_random_voices", {
+        languages: checked,
       });
-      status.textContent = "✓ Done";
-      status.className   = "status ok";
     } catch (err) {
-      status.textContent = "✗ Error - check logs";
-      status.className   = "status error";
-    } finally {
-      // Re-enable button and clear status after 2.5s
+      console.error("TikTokTTS: failed to save random voice languages", err);
+    }
+
+    this._settingsOpen = false;
+    this.shadowRoot.getElementById("settings-panel").classList.remove("open");
+    this.shadowRoot.getElementById("btn-gear").classList.remove("active");
+  }
+
+  /** Handle Speak button press.
+   *  Validates the message, disables the button briefly, calls button.press. */
+  async _speak() {
+    const btn = this.shadowRoot.getElementById("btn-speak");
+    const msg = this.shadowRoot.getElementById("inp-message").value.trim();
+
+    if (!msg) {
+      btn.textContent = "⚠️ No message!";
       setTimeout(() => {
         btn.disabled = false;
         btn.innerHTML = `
@@ -643,9 +792,29 @@ class TikTokTTSCard extends HTMLElement {
             <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3M8 22h8"/>
           </svg>
           Speak...`;
-        status.textContent = "";
-        status.className   = "status";
-      }, 2500);
+      }, 2000);
+      return;
+    }
+
+    btn.disabled  = true;
+    btn.textContent = "Speaking…";
+
+    try {
+      await this._hass.callService("button", "press", {
+        entity_id: this._entities.speak,
+      });
+    } catch (err) {
+      console.error("TikTokTTS: speak failed", err);
+    } finally {
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18">
+            <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3M8 22h8"/>
+          </svg>
+          Speak...`;
+      }, 2000);
     }
   }
 
@@ -663,7 +832,7 @@ class TikTokTTSCard extends HTMLElement {
   // -------------------------------------------------------------------------
 
   /** Tells HA how many dashboard rows this card occupies. */
-  getCardSize() { return 6; }
+  getCardSize() { return 5; }
 
   /** Default config stub shown in the visual card editor. */
   static getStubConfig() { return {}; }
