@@ -36,17 +36,14 @@ Random voice support
 --------------------
 When the selected voice code is RANDOM_VOICE_CODE ("random"), the button:
   1. Sets cache=False so HA does not serve stale audio from the file cache.
-  2. Sets hass.data[DOMAIN]["_random_voice_active"] = True before calling
-     tts.speak. This flag is read by _RandomVoiceAwareCache (in __init__.py)
-     which intercepts HA's in-memory TTS cache lookup and returns a miss,
-     forcing async_get_tts_audio in tts.py to be called on every press
-     regardless of message text. Without this, HA would return the first
-     cached audio forever.
-  The flag is cleared inside async_get_tts_audio after the random voice is
-  resolved, then immediately set back to True, creating a self-perpetuating
-  mechanism so subsequent automation tts.speak calls also get fresh voices.
+  2. Passes a unique _random_seed value (UUID) in the tts.speak options dict.
+     HA includes all supported_options keys in the TTS cache key hash, so a
+     unique seed guarantees a cache miss and forces async_get_tts_audio in
+     tts.py to be called on every press regardless of message text.
 """
 from __future__ import annotations
+
+from uuid import uuid4
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
@@ -68,7 +65,7 @@ from .const import (
     HASS_DATA_BUTTON_CREATED,
     LOGGER,
     PLACEHOLDER_LOADING,
-    PLACEHOLDER_NO_DEVICES,
+    RANDOM_SEED_KEY,
     RANDOM_VOICE_CODE,
     TTS_SERVICE_DOMAIN,
     TTS_SERVICE_FIELD_CACHE,
@@ -130,9 +127,8 @@ class SpeakButtonEntity(ButtonEntity):
         their dropdowns display friendly names while storing API values in
         the attribute.
 
-        When random voice is selected, caching is disabled and the
-        _random_voice_active flag is set before calling tts.speak so the
-        _RandomVoiceAwareCache subclass forces a cache miss on this call.
+        When random voice is selected, caching is disabled and a unique
+        _random_seed is passed in the options to force a cache miss.
         """
         # Strip whitespace - the card sends a single space when the textarea
         # is empty (HA text entity rejects truly empty strings), so we must
@@ -154,7 +150,7 @@ class SpeakButtonEntity(ButtonEntity):
             )
             return
 
-        if not device or device in (PLACEHOLDER_LOADING, PLACEHOLDER_NO_DEVICES):
+        if not device or device == PLACEHOLDER_LOADING:
             LOGGER.warning(
                 "TikTokTTS Speak button pressed but no output device is selected."
             )
@@ -168,12 +164,10 @@ class SpeakButtonEntity(ButtonEntity):
             )
             return
 
-        # Disable caching for random voice so HA does not serve stale audio.
-        # Also set the _random_voice_active flag so _RandomVoiceAwareCache
-        # forces a mem_cache miss, ensuring async_get_tts_audio is called.
         use_cache = voice != RANDOM_VOICE_CODE
-        if voice == RANDOM_VOICE_CODE and DOMAIN in self.hass.data:
-            self.hass.data[DOMAIN]["_random_voice_active"] = True
+        options_dict = {TTS_SERVICE_FIELD_VOICE: voice}
+        if voice == RANDOM_VOICE_CODE:
+            options_dict[RANDOM_SEED_KEY] = str(uuid4())
 
         LOGGER.debug(
             "Speak button: entity=%s device=%s voice=%s cache=%s message=%s",
@@ -188,7 +182,7 @@ class SpeakButtonEntity(ButtonEntity):
                 TTS_SERVICE_FIELD_PLAYER:  device,
                 TTS_SERVICE_FIELD_MESSAGE: message,
                 TTS_SERVICE_FIELD_CACHE:   use_cache,
-                TTS_SERVICE_FIELD_OPTIONS: {TTS_SERVICE_FIELD_VOICE: voice},
+                TTS_SERVICE_FIELD_OPTIONS: options_dict,
             },
             target={"entity_id": tts_entity},
         )

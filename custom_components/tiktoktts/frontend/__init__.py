@@ -19,9 +19,8 @@ How it works
 4. The card URL includes a ?v=<version> query string so the browser cache
    is busted automatically on each integration version bump.
 
-5. async_unregister() is available to clean up the resource entry when the
-   integration is removed, though HA does not currently call it automatically
-   — it is provided for completeness and future use.
+5. async_unregister() cleans up the resource entry when the last config
+   entry is removed. It is called from async_unload_entry in __init__.py.
 
 Note on imports
 ---------------
@@ -98,10 +97,22 @@ class JSModuleRegistration:
         """Wait for Lovelace resources to finish loading, then register.
 
         Lovelace resources may not be loaded immediately after
-        homeassistant_started. This method retries every 5 seconds until
-        they are available, then calls _async_register_module().
+        homeassistant_started. This method retries every 5 seconds up to
+        _MAX_RETRIES times, then gives up with a warning.
         """
+        _MAX_RETRIES = 12
+        attempts = {"n": 0}
+
         async def _check(_now: Any) -> None:
+            attempts["n"] += 1
+            if attempts["n"] > _MAX_RETRIES:
+                _LOGGER.warning(
+                    "TikTokTTS: gave up waiting for Lovelace resources after %d attempts. "
+                    "If using YAML mode, add the card resource manually.",
+                    _MAX_RETRIES,
+                )
+                return
+
             try:
                 lovelace = self.hass.data.get("lovelace")
                 if lovelace is None:
@@ -109,7 +120,6 @@ class JSModuleRegistration:
                     async_call_later(self.hass, 5, _check)
                     return
 
-                # Access the resource collection — works for both storage and managed modes
                 resources = getattr(lovelace, "resources", None)
                 if resources is None:
                     _LOGGER.debug("TikTokTTS: Lovelace resources not available — retrying in 5s")

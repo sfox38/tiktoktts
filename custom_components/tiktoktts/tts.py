@@ -32,10 +32,9 @@ Random voice mode
 -----------------
 When voice=random is passed in options, async_get_tts_audio picks a voice at
 random from the language pool stored in hass.data[DOMAIN][HASS_DATA_RANDOM_LANGS].
-After generating audio, it sets _random_voice_active=True in hass.data[DOMAIN].
-This flag is read by _RandomVoiceAwareCache (in __init__.py) which forces a cache
-miss on the next call, ensuring a fresh random voice is picked every time. The
-self-perpetuating flag mechanism works for both dashboard and automation callers.
+Cache uniqueness is handled by the caller: button.py passes a unique _random_seed
+in the options dict for each call, which HA includes in the cache key hash so
+every random voice call is a guaranteed cache miss.
 
 Config is read dynamically on every call
 -----------------------------------------
@@ -55,6 +54,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import binascii
 import json
 from typing import Any
 
@@ -99,6 +99,7 @@ from .const import (
     PROXY_API_FIELD_TEXT,
     PROXY_API_FIELD_VOICE,
     PROXY_API_PATH_GENERATE,
+    RANDOM_SEED_KEY,
     RANDOM_VOICE_CODE,
     REQUEST_MAX_RETRIES,
     REQUEST_RETRY_DELAY,
@@ -146,10 +147,10 @@ class TikTokTTSEntity(TextToSpeechEntity):
         entry and one direct API entry. Using a hardcoded string like DOMAIN
         would cause HA to silently discard any second instance as a duplicate.
 
-        The entity name is derived from _attr_name which is set dynamically
-        below based on the API mode, giving human-readable entity IDs:
-          - tts.tiktok_tts_proxy  (proxy mode)
-          - tts.tiktok_tts_direct (direct mode)
+        The entity_id is set explicitly below based on the API mode:
+          - tts.tiktoktts_proxy  (proxy mode)
+          - tts.tiktoktts_direct (direct mode)
+        The friendly name is provided by a separate name property.
         """
         self.hass = hass
         self._config_entry = config_entry
@@ -252,10 +253,12 @@ class TikTokTTSEntity(TextToSpeechEntity):
     def supported_options(self) -> list[str]:
         """Return the list of option keys accepted by async_get_tts_audio.
 
-        'voice' is the only supported option - it lets callers override the
-        default voice per-call via the options field of the tts.speak action.
+        'voice' lets callers override the default voice per-call.
+        '_random_seed' is a unique value used to force a cache miss when
+        random voice mode is active — HA includes all supported_options
+        keys in the TTS cache key hash.
         """
-        return [CONF_VOICE]
+        return [CONF_VOICE, RANDOM_SEED_KEY]
 
     @property
     def default_options(self) -> dict[str, str]:
@@ -303,6 +306,7 @@ class TikTokTTSEntity(TextToSpeechEntity):
           5. Global DEFAULT_VOICE constant as a last resort
         """
         options = options or {}
+        options.pop(RANDOM_SEED_KEY, None)
 
         voice = options.get(CONF_VOICE)
         if not voice:
@@ -339,17 +343,9 @@ class TikTokTTSEntity(TextToSpeechEntity):
                 voice = DEFAULT_VOICE
                 LOGGER.warning("Random voice language set is empty; using default voice")
 
-            result = await (
-                self._get_audio_direct(message, voice)
-                if self._api_mode == API_MODE_DIRECT
-                else self._get_audio_proxy(message, voice)
-            )
-            # Set the flag AFTER generating audio so the next tts.speak call
-            # (from any source) is also forced to be a cache miss, ensuring
-            # async_get_tts_audio is always called for voice=random.
-            # See _RandomVoiceAwareCache in __init__.py for the full mechanism.
-            self.hass.data[DOMAIN]["_random_voice_active"] = True
-            return result
+            if self._api_mode == API_MODE_DIRECT:
+                return await self._get_audio_direct(message, voice)
+            return await self._get_audio_proxy(message, voice)
 
         # If the voice is not in our known list, log a debug message but
         # still pass it through to TikTok's API. This allows users to test
@@ -423,7 +419,11 @@ class TikTokTTSEntity(TextToSpeechEntity):
                     )
                     return None, None
 
-                return AUDIO_FORMAT, base64.b64decode(payload[PROXY_API_FIELD_DATA])
+                try:
+                    return AUDIO_FORMAT, base64.b64decode(payload[PROXY_API_FIELD_DATA])
+                except binascii.Error as exc:
+                    LOGGER.error("Proxy API: base64 decode failed: %s", exc)
+                    return None, None
 
             except asyncio.TimeoutError:
                 LOGGER.warning(
@@ -549,7 +549,14 @@ class TikTokTTSEntity(TextToSpeechEntity):
                                     "data for chunk %d", chunk_index,
                                 )
                                 return None
-                            return base64.b64decode(vstr)
+                            try:
+                                return base64.b64decode(vstr)
+                            except binascii.Error as exc:
+                                LOGGER.error(
+                                    "Direct API: base64 decode failed for chunk %d: %s",
+                                    chunk_index, exc,
+                                )
+                                return None
 
                         # Non-zero TikTok status codes indicate API-level errors
                         status_msg = payload.get(DIRECT_API_FIELD_STATUS_MSG, "unknown")
@@ -617,9 +624,11 @@ def _split_text(text: str, chunk_size: int) -> list[str]:
     per-request character limit (DIRECT_API_CHUNK_SIZE = 200).
 
     Split priority:
-      1. Sentence boundary - looks for the last '.', '!', or '?' within the
-         allowed window and splits after it. Produces the most natural-sounding
-         audio since each chunk ends at a complete sentence.
+      1. Sentence boundary - looks for the last '. ', '! ', or '? ' within
+         the allowed window and splits after the punctuation mark. Using
+         delimiter+space avoids false splits on abbreviations (Dr., U.S.),
+         numbers (3.14), and URLs. Produces the most natural-sounding audio
+         since each chunk ends at a complete sentence.
       2. Word boundary - if no sentence boundary exists, splits at the last
          space within the window. Avoids cutting words in half.
       3. Hard split - last resort if the text contains no spaces or punctuation
@@ -639,14 +648,19 @@ def _split_text(text: str, chunk_size: int) -> list[str]:
         window = remaining[:chunk_size]
         split_pos = -1
 
-        # Look for the rightmost sentence-ending punctuation in the window
-        for delimiter in (".", "!", "?"):
+        # Look for sentence-ending punctuation followed by a space, so we
+        # don't split on periods in abbreviations ("Dr."), decimals ("3.14"),
+        # or URLs ("example.com").
+        for delimiter in (". ", "! ", "? "):
             pos = window.rfind(delimiter)
             if pos > split_pos:
                 split_pos = pos
 
+        # Also check if the window ends exactly on punctuation
+        if split_pos < 0 and window[-1] in ".!?":
+            split_pos = len(window) - 1
+
         if split_pos > 0:
-            # Sentence boundary found - include the punctuation in this chunk
             chunks.append(remaining[: split_pos + 1].strip())
             remaining = remaining[split_pos + 1 :].strip()
         else:

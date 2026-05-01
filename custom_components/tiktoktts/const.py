@@ -9,7 +9,7 @@ LOGGER: Logger = getLogger(__package__)
 
 NAME = "TikTok TTS"
 DOMAIN = "tiktoktts"
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 
 # ---------------------------------------------------------------------------
 # Attribution & credits
@@ -471,7 +471,10 @@ SERVICE_SET_RANDOM_VOICES = "set_random_voices"
 
 # Placeholder shown in device/voice dropdowns before data is loaded
 PLACEHOLDER_LOADING = "(loading...)"
-PLACEHOLDER_NO_DEVICES = "(none available - restart HA)"
+
+# Key added to supported_options so HA includes it in the TTS cache key hash.
+# A unique value per call forces a cache miss for random voice mode.
+RANDOM_SEED_KEY = "_random_seed"
 
 # ---------------------------------------------------------------------------
 # TTS service call constants

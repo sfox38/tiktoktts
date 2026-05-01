@@ -124,7 +124,6 @@ from .const import (
     HASS_DATA_SELECT_CREATED,
     HASS_DATA_TEXT_CREATED,
     LOGGER,
-    RANDOM_VOICE_CODE,
     SERVICE_SET_RANDOM_VOICES,
     SUPPORTED_LANGUAGES,
 )
@@ -143,42 +142,6 @@ _STORAGE_KEY     = f"{DOMAIN}_random_voices"
 _STORAGE_VERSION = 1
 
 
-class _RandomVoiceAwareCache(dict):
-    """A dict subclass that makes HA's TTS mem_cache always miss for random voice calls.
-
-    On the first random voice call, async_get_tts_audio sets _random_voice_active=True
-    just before returning. On the next call, get() sees the flag and returns a miss,
-    forcing async_get_tts_audio to be called again. This self-perpetuating mechanism
-    works for both the dashboard card and direct tts.speak automation calls.
-    """
-
-    def __init__(self, hass_ref: list, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self._hass_ref = hass_ref
-
-    def _is_random_active(self) -> bool:
-        try:
-            hass = self._hass_ref[0]
-            return hass.data.get(DOMAIN, {}).get("_random_voice_active", False)
-        except Exception:
-            return False
-
-    def __contains__(self, key: object) -> bool:
-        if self._is_random_active():
-            return False
-        return super().__contains__(key)
-
-    def get(self, key: object, default=None) -> object:
-        if self._is_random_active():
-            return default
-        return super().get(key, default)
-
-    def __getitem__(self, key: object) -> object:
-        if self._is_random_active():
-            raise KeyError(key)
-        return super().__getitem__(key)
-
-
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Register the Lovelace card resource and initialize the random voice store.
 
@@ -195,7 +158,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
     saved = await store.async_load()
     if saved and isinstance(saved.get("languages"), list):
-        langs = [l for l in saved["languages"] if l in SUPPORTED_LANGUAGES]
+        langs = [lang for lang in saved["languages"] if lang in SUPPORTED_LANGUAGES]
     else:
         langs = []
     hass.data[DOMAIN][HASS_DATA_RANDOM_LANGS] = langs
@@ -203,7 +166,10 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
     async def _handle_set_random_voices(call) -> None:
         languages = call.data.get("languages", [])
-        valid = [l for l in languages if l in SUPPORTED_LANGUAGES]
+        valid = [lang for lang in languages if lang in SUPPORTED_LANGUAGES]
+        invalid = [lang for lang in languages if lang not in SUPPORTED_LANGUAGES]
+        if invalid:
+            LOGGER.warning("Rejected unknown language codes from set_random_voices: %s", invalid)
         hass.data[DOMAIN][HASS_DATA_RANDOM_LANGS] = valid
         await store.async_save({"languages": valid})
         LOGGER.debug("Random voice languages saved: %s", valid)
@@ -223,7 +189,6 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
     async def _register_frontend(_event=None) -> None:
         await JSModuleRegistration(hass).async_register()
-        _install_random_voice_cache(hass)
 
     if hass.state == CoreState.running:
         await _register_frontend()
@@ -231,28 +196,6 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _register_frontend)
 
     return True
-
-
-def _install_random_voice_cache(hass: HomeAssistant) -> None:
-    """Replace HA's TTS mem_cache with our random-voice-aware subclass."""
-    try:
-        manager = hass.data.get("tts_manager")
-        if manager is None:
-            LOGGER.warning("TikTokTTS: could not find TTS SpeechManager - random voice cache not installed")
-            return
-        existing = getattr(manager, "mem_cache", None)
-        if existing is None:
-            LOGGER.warning("TikTokTTS: TTS SpeechManager has no mem_cache - random voice cache not installed")
-            return
-        if isinstance(existing, _RandomVoiceAwareCache):
-            LOGGER.debug("TikTokTTS: random voice cache already installed")
-            return
-        hass_ref = [hass]
-        new_cache = _RandomVoiceAwareCache(hass_ref, existing)
-        manager.mem_cache = new_cache
-        LOGGER.debug("TikTokTTS: random voice cache installed successfully")
-    except Exception:  # noqa: BLE001
-        LOGGER.warning("TikTokTTS: failed to install random voice cache - voice=random may not work correctly")
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -277,7 +220,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             hass.data[DOMAIN][HASS_DATA_RANDOM_STORE] = store
         saved = await store.async_load()
         if saved and isinstance(saved.get("languages"), list):
-            langs = [l for l in saved["languages"] if l in SUPPORTED_LANGUAGES]
+            langs = [lang for lang in saved["languages"] if lang in SUPPORTED_LANGUAGES]
         else:
             langs = []
         hass.data[DOMAIN][HASS_DATA_RANDOM_LANGS] = langs
@@ -300,16 +243,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not hass.data[DOMAIN].get(shared_setup_key):
         await hass.config_entries.async_forward_entry_setups(entry, SHARED_PLATFORMS)
         hass.data[DOMAIN][shared_setup_key] = True
-
-    if not hass.data[DOMAIN].get("random_cache_installed"):
-        async def _install_cache(_event=None) -> None:
-            _install_random_voice_cache(hass)
-            hass.data[DOMAIN]["random_cache_installed"] = True
-
-        if hass.state == CoreState.running:
-            await _install_cache()
-        else:
-            hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _install_cache)
 
     entry.async_on_unload(
         entry.add_update_listener(_async_update_listener)
@@ -352,6 +285,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload_ok:
         if is_last_entry:
             LOGGER.debug("Last TikTokTTS config entry unloaded - clearing all data")
+            await JSModuleRegistration(hass).async_unregister()
             hass.data.pop(DOMAIN, None)
         elif had_shared and DOMAIN in hass.data:
             # The entry that owned the shared platforms was disabled/removed

@@ -17,7 +17,7 @@
  *   - _isFocused flag tracks textarea focus instead of document.activeElement
  *     because Shadow DOM isolates the active element - the standard check always
  *     returns the shadow host, never the textarea inside it.
- *   - Message sync is debounced 350ms so HA isn't called on every keystroke.
+ *   - Message sync is debounced 600ms so HA isn't called on every keystroke.
  *   - Empty message sends a single space instead of "" because HA's text entity
  *     rejects truly empty strings with "required key not provided". button.py
  *     strips whitespace so the space is never actually spoken.
@@ -79,16 +79,14 @@ class TikTokTTSCard extends HTMLElement {
       <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
-        /* CSS custom properties.
-           Backgrounds and borders use fixed dark values so the card always
-           looks structured regardless of HA theme. Text and accent colours
-           use HA theme variables so they follow the user's theme. */
+        /* CSS custom properties mapped to HA theme variables so the card
+           follows the user's chosen theme (light or dark) automatically. */
         :host {
-          --tts-bg:         #1c1c1e;
-          --tts-card-bg:    #2c2c2e;
-          --tts-field-bg:   #242426;
-          --tts-border:     #3a3a3c;
-          --tts-border-dim: #2c2c2e;
+          --tts-bg:         var(--primary-background-color, #1c1c1e);
+          --tts-card-bg:    var(--ha-card-background, var(--card-background-color, #2c2c2e));
+          --tts-field-bg:   var(--input-fill-color, var(--secondary-background-color, #242426));
+          --tts-border:     var(--divider-color, #3a3a3c);
+          --tts-border-dim: var(--divider-color, #2c2c2e);
           --tts-accent:     var(--primary-color, #30d158);
           --tts-text:       var(--primary-text-color, #f2f2f7);
           --tts-text-dim:   var(--secondary-text-color, #8e8e93);
@@ -107,7 +105,7 @@ class TikTokTTSCard extends HTMLElement {
           flex-direction: column;
           gap: 14px;
           border: 1px solid var(--tts-border);
-          box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+          box-shadow: var(--ha-card-box-shadow, 0 4px 24px rgba(0,0,0,0.18));
         }
 
         /* Card header */
@@ -203,8 +201,8 @@ class TikTokTTSCard extends HTMLElement {
         }
 
         select option {
-          background: #2c2c2e;
-          color: #f2f2f7;
+          background: var(--input-fill-color, var(--secondary-background-color, #2c2c2e));
+          color: var(--primary-text-color, #f2f2f7);
         }
 
         /* Voice API ID - monospace, dimmed label, selectable code value */
@@ -617,10 +615,6 @@ class TikTokTTSCard extends HTMLElement {
       }
     }
 
-    // Device dropdown - options come from friendly names, current value is
-    // also a friendly name (deviceState.state). Use requestAnimationFrame to
-    // retry setting the value after the DOM settles, which fixes the issue
-    // where the device reverts to the first item on page reload.
     // Device dropdown - the correct selection is guaranteed by select.py's
     // _async_refresh_devices() which preserves the restored device_id and
     // waits for late-registering players rather than falling back to index 0.
@@ -681,7 +675,7 @@ class TikTokTTSCard extends HTMLElement {
   }
 
   /** Update the character counter below the message textarea.
-   *  Colour changes: neutral -> orange at 350 -> red at 450. */
+   *  Colour changes: neutral -> orange at 200 -> red at 230. */
   _updateCharCount(len) {
     const el = this.shadowRoot.getElementById("char-count");
     el.textContent = `${len} / 255`;

@@ -211,18 +211,24 @@ class TikTokTTSConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             endpoint = user_input[CONF_ENDPOINT].rstrip("/")
-            error = await _test_proxy_endpoint(self.hass, endpoint)
-            if error:
-                errors["base"] = error
+            if not endpoint.lower().startswith(("http://", "https://")):
+                errors["base"] = "invalid_url_scheme"
             else:
-                return self.async_create_entry(
-                    title=f"TikTok TTS (proxy: {endpoint})",
-                    data={
-                        CONF_API_MODE: API_MODE_PROXY,
-                        CONF_ENDPOINT: endpoint,
-                        CONF_VOICE: user_input[CONF_VOICE],
-                    },
-                )
+                error = await _test_proxy_endpoint(self.hass, endpoint)
+                if error:
+                    errors["base"] = error
+                else:
+                    for entry in self.hass.config_entries.async_entries(DOMAIN):
+                        if entry.data.get(CONF_API_MODE) == API_MODE_PROXY:
+                            return self.async_abort(reason="already_configured")
+                    return self.async_create_entry(
+                        title=f"TikTok TTS (proxy: {endpoint})",
+                        data={
+                            CONF_API_MODE: API_MODE_PROXY,
+                            CONF_ENDPOINT: endpoint,
+                            CONF_VOICE: user_input[CONF_VOICE],
+                        },
+                    )
 
         return self.async_show_form(
             step_id="proxy",
@@ -255,6 +261,9 @@ class TikTokTTSConfigFlow(ConfigFlow, domain=DOMAIN):
             if error:
                 errors["base"] = error
             else:
+                for entry in self.hass.config_entries.async_entries(DOMAIN):
+                    if entry.data.get(CONF_API_MODE) == API_MODE_DIRECT:
+                        return self.async_abort(reason="already_configured")
                 return self.async_create_entry(
                     title="TikTok TTS (direct API)",
                     data={
@@ -334,25 +343,23 @@ class TikTokTTSOptionsFlow(OptionsFlow):
         if user_input is not None:
             endpoint = user_input[CONF_ENDPOINT].rstrip("/")
 
-            if api_mode == API_MODE_PROXY:
-                error = await _test_proxy_endpoint(self.hass, endpoint)
+            if not endpoint.lower().startswith(("http://", "https://")):
+                errors["base"] = "invalid_url_scheme"
             else:
-                session_id = user_input.get(CONF_SESSION_ID, "").strip()
-                error = await _test_direct_endpoint(self.hass, endpoint, session_id)
+                if api_mode == API_MODE_PROXY:
+                    error = await _test_proxy_endpoint(self.hass, endpoint)
+                else:
+                    session_id = user_input.get(CONF_SESSION_ID, "").strip()
+                    error = await _test_direct_endpoint(self.hass, endpoint, session_id)
 
-            if error:
-                errors["base"] = error
-            else:
-                # Merge submitted values into the full current data dict.
-                # This preserves CONF_API_MODE (not shown in the options form)
-                # and any future keys that may be added without breaking old entries.
-                updated_data = {**current, **user_input}
-                self.hass.config_entries.async_update_entry(
-                    self.config_entry, data=updated_data
-                )
-                # Close the options flow. The actual data was already persisted
-                # above - this empty entry just signals "flow is done".
-                return self.async_create_entry(title="", data={})
+                if error:
+                    errors["base"] = error
+                else:
+                    updated_data = {**current, **user_input}
+                    self.hass.config_entries.async_update_entry(
+                        self.config_entry, data=updated_data
+                    )
+                    return self.async_create_entry(title="", data={})
 
         # Build the form schema, choosing fields appropriate to the current mode.
         # Proxy mode shows: endpoint URL + voice.
