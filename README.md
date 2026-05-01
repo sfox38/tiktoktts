@@ -69,7 +69,7 @@ Go to **Settings -> System -> Restart** and do a full restart (not Quick Reload)
 Follow the [Installation](#installation) steps below. When you reach **Settings -> Devices & Services -> Add Integration**, you will go through the new UI setup wizard to reconfigure your endpoint and default voice.
 
 > [!NOTE]
-> Any automations that used the depricated `tts.tiktoktts_say` service call will need to be updated to use the `tts.speak` action format shown in the [Usage](#usage) section below.
+> Any automations that used the deprecated `tts.tiktoktts_say` service call will need to be updated to use the `tts.speak` action format shown in the [Usage](#usage) section below.
 </details>
 
 
